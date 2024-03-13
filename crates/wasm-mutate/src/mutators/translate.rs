@@ -108,6 +108,10 @@ pub trait Translator {
         memarg(self.as_obj(), arg)
     }
 
+    fn translate_ordering(&mut self, arg: &wasmparser::Ordering) -> Result<Ordering> {
+        todo!()
+    }
+
     fn remap(&mut self, item: Item, idx: u32) -> Result<u32> {
         let _ = item;
         Ok(idx)
@@ -170,6 +174,7 @@ pub fn global_type(
     Ok(wasm_encoder::GlobalType {
         val_type: t.translate_ty(&ty.content_type)?,
         mutable: ty.mutable,
+        shared: ty.shared,
     })
 }
 
@@ -367,6 +372,7 @@ pub fn op(t: &mut dyn Translator, op: &Operator<'_>) -> Result<Instruction<'stat
         (map $arg:ident from_ref_type) => (t.translate_refty($arg)?);
         (map $arg:ident to_ref_type) => (t.translate_refty($arg)?);
         (map $arg:ident memarg) => (t.translate_memarg($arg)?);
+        (map $arg:ident ordering) => (t.translate_ordering($arg)?);
         (map $arg:ident local_index) => (*$arg);
         (map $arg:ident value) => ($arg);
         (map $arg:ident lane) => (*$arg);

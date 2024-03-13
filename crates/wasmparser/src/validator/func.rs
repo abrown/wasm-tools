@@ -93,6 +93,8 @@ impl<T: WasmModuleResources> FuncValidator<T> {
         let mut reader = body.get_binary_reader();
         self.read_locals(&mut reader)?;
         reader.allow_memarg64(self.validator.features.memory64);
+        // dbg!(self.validator.features.shared_everything_threads);
+        reader.allow_extended_shared(self.validator.features.shared_everything_threads);
         while !reader.eof() {
             reader.visit_operator(&mut self.visitor(reader.original_position()))??;
         }

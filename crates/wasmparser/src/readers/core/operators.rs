@@ -107,6 +107,15 @@ impl V128 {
     }
 }
 
+/// Represents the memory ordering for atomic instructions.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum Ordering {
+    /// TODO
+    SeqCst,
+    /// TODO
+    RelAcq,
+}
+
 macro_rules! define_operator {
     ($(@$proposal:ident $op:ident $({ $($payload:tt)* })? => $visit:ident)*) => {
         /// Instructions as defined [here].

@@ -1077,8 +1077,14 @@ impl Printer {
             self.print_name(&state.core.global_names, state.core.globals)?;
             self.result.push(' ');
         }
-        if ty.mutable {
-            self.result.push_str("(mut ");
+        if ty.shared || ty.mutable {
+            self.result.push('(');
+            if ty.shared {
+                self.result.push_str("shared ");
+            }
+            if ty.mutable {
+                self.result.push_str("mut ");
+            }
             self.print_valtype(state, ty.content_type)?;
             self.result.push(')');
         } else {
@@ -1223,6 +1229,7 @@ impl Printer {
 
         let nesting_start = self.nesting;
         body.allow_memarg64(true);
+        body.allow_extended_shared(true);
 
         let mut buf = String::new();
         let mut op_printer = operator::PrintOperator::new(self, state);
@@ -2303,6 +2310,27 @@ impl Printer {
                     self.result.push(' ');
                     self.start_group("canon resource.rep ");
                     self.print_idx(&state.component.type_names, resource)?;
+                    self.end_group();
+                    self.end_group();
+                    state.core.funcs += 1;
+                }
+                CanonicalFunction::ThreadSpawn {
+                    func_ty_index: func_index,
+                } => {
+                    self.start_group("core func ");
+                    self.print_name(&state.core.func_names, state.core.funcs)?;
+                    self.result.push(' ');
+                    self.start_group("canon thread.spawn ");
+                    self.print_idx(&state.component.type_names, func_index)?;
+                    self.end_group();
+                    self.end_group();
+                    state.core.funcs += 1;
+                }
+                CanonicalFunction::ThreadHwConcurrency => {
+                    self.start_group("core func ");
+                    self.print_name(&state.core.func_names, state.core.funcs)?;
+                    self.result.push(' ');
+                    self.start_group("canon thread.hw_concurrency");
                     self.end_group();
                     self.end_group();
                     state.core.funcs += 1;

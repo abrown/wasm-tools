@@ -218,6 +218,9 @@ pub struct WasmFeatures {
     pub relaxed_simd: bool,
     /// The WebAssembly threads proposal (enabled by default)
     pub threads: bool,
+    /// The WebAssembly shared-everything-threads proposal; includes new
+    /// component model built-ins.
+    pub shared_everything_threads: bool,
     /// The WebAssembly tail-call proposal (enabled by default)
     pub tail_call: bool,
     /// Whether or not floating-point instructions are enabled.
@@ -266,6 +269,7 @@ impl WasmFeatures {
             simd: true,
             relaxed_simd: true,
             threads: true,
+            shared_everything_threads: true,
             tail_call: true,
             floats: true,
             multi_memory: true,
@@ -377,6 +381,7 @@ impl Default for WasmFeatures {
             gc: false,
             component_model_values: false,
             component_model_nested_names: false,
+            shared_everything_threads: false,
 
             // On-by-default features (phase 4 or greater).
             mutable_global: true,
@@ -1166,6 +1171,7 @@ impl Validator {
         &mut self,
         section: &crate::ComponentCanonicalSectionReader,
     ) -> Result<()> {
+        let shared_everything_threads = self.features.shared_everything_threads;
         self.process_component_section(
             section,
             "function",
@@ -1207,6 +1213,24 @@ impl Validator {
                     }
                     crate::CanonicalFunction::ResourceRep { resource } => {
                         current.resource_rep(resource, types, offset)
+                    }
+                    crate::CanonicalFunction::ThreadSpawn { func_ty_index } => {
+                        if !shared_everything_threads {
+                            bail!(
+                                offset,
+                                "invalid `thread.spawn`; shared-everything threads is not enabled"
+                            )
+                        }
+                        current.thread_spawn(func_ty_index, types, offset)
+                    }
+                    crate::CanonicalFunction::ThreadHwConcurrency => {
+                        if !shared_everything_threads {
+                            bail!(
+                                offset,
+                                "invalid `thread.hw_concurrency`; shared-everything threads is not enabled"
+                            )
+                        }
+                        current.thread_hw_concurrency(types, offset)
                     }
                 }
             },

@@ -1,0 +1,13 @@
+(module
+  (type (;0;) (func (result i32)))
+  (func (;0;) (type 0) (result i32)
+    global.get $x
+  )
+  (func (;1;) (type 0) (result i32)
+    global.atomic.get seq_cst $x
+  )
+  (global $x (;0;) (mut i32) i32.const -1)
+  (global $sx (;1;) (shared i64) i64.const 1)
+  (export "get-x" (func 0))
+  (export "get-x-seqconst" (func 1))
+)

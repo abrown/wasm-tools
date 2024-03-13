@@ -493,11 +493,14 @@ impl Encode for MemoryType {
 impl<'a> Encode for GlobalType<'a> {
     fn encode(&self, e: &mut Vec<u8>) {
         self.ty.encode(e);
+        let mut flags = 0;
         if self.mutable {
-            e.push(0x01);
-        } else {
-            e.push(0x00);
+            flags |= 0b01;
         }
+        if self.shared {
+            flags |= 0b10;
+        }
+        e.push(flags);
     }
 }
 
@@ -768,6 +771,23 @@ impl Encode for MemArg<'_> {
                 self.offset.encode(e);
             }
         }
+    }
+}
+
+impl Encode for Ordering {
+    fn encode(&self, buf: &mut Vec<u8>) {
+        let flag: u8 = match self {
+            Ordering::SeqCst => 0,
+            Ordering::AcqRel => 1,
+        };
+        flag.encode(buf);
+    }
+}
+
+impl Encode for OrderedAccess<'_> {
+    fn encode(&self, buf: &mut Vec<u8>) {
+        self.ordering.encode(buf);
+        self.index.encode(buf);
     }
 }
 

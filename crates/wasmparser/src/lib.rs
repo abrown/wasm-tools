@@ -43,7 +43,7 @@
 /// The list of specializable Wasm proposals is as follows:
 ///
 /// - `@mvp`: Denoting a Wasm operator from the initial Wasm MVP version.
-/// - `@exceptions`: [Wasm `expection-handling` proposal]
+/// - `@exceptions`: [Wasm `exception-handling` proposal]
 /// - `@tail_call`: [Wasm `tail-calls` proposal]
 /// - `@reference_types`: [Wasm `reference-types` proposal]
 /// - `@sign_extension`: [Wasm `sign-extension-ops` proposal]
@@ -54,7 +54,7 @@
 /// - `@relaxed_simd`: [Wasm `relaxed-simd` proposal]
 /// - `@gc`: [Wasm `gc` proposal]
 ///
-/// [Wasm `expection-handling` proposal]:
+/// [Wasm `exception-handling` proposal]:
 /// https://github.com/WebAssembly/exception-handling
 ///
 /// [Wasm `tail-calls` proposal]:
@@ -467,6 +467,12 @@ macro_rules! for_each_operator {
             @threads I64AtomicRmw8CmpxchgU { memarg: $crate::MemArg } => visit_i64_atomic_rmw8_cmpxchg_u
             @threads I64AtomicRmw16CmpxchgU { memarg: $crate::MemArg } => visit_i64_atomic_rmw16_cmpxchg_u
             @threads I64AtomicRmw32CmpxchgU { memarg: $crate::MemArg } => visit_i64_atomic_rmw32_cmpxchg_u
+
+            // Also 0xFE prefixed operators
+            // shared-everything threads
+            // https://github.com/WebAssembly/shared-everything-threads
+            @threads GlobalAtomicGet { ordering: $crate::Ordering, global_index: u32 } => visit_global_atomic_get
+            @threads GlobalAtomicSet { ordering: $crate::Ordering, global_index: u32 } => visit_global_atomic_set
 
             // 0xFD operators
             // 128-bit SIMD

@@ -105,6 +105,7 @@ pub struct BinaryReader<'a> {
     pub(crate) position: usize,
     original_offset: usize,
     allow_memarg64: bool,
+    pub(crate) allow_extended_shared: bool,
 }
 
 impl<'a> BinaryReader<'a> {
@@ -125,6 +126,7 @@ impl<'a> BinaryReader<'a> {
             position: 0,
             original_offset: 0,
             allow_memarg64: false,
+            allow_extended_shared: false,
         }
     }
 
@@ -135,6 +137,7 @@ impl<'a> BinaryReader<'a> {
             position: 0,
             original_offset,
             allow_memarg64: false,
+            allow_extended_shared: false,
         }
     }
 
@@ -150,6 +153,15 @@ impl<'a> BinaryReader<'a> {
     /// WebAssembly proposal is also enabled.
     pub fn allow_memarg64(&mut self, allow: bool) {
         self.allow_memarg64 = allow;
+    }
+
+    /// Whether or not to allow the use of `shared` attributes for objects other
+    /// than memories.
+    ///
+    /// This is intended to be `true` when support for the
+    /// shared-everything-threads WebAssembly proposal is also enabled.
+    pub fn allow_extended_shared(&mut self, allow: bool) {
+        self.allow_extended_shared = allow;
     }
 
     /// Returns a range from the starting offset to the end of the buffer.
@@ -275,6 +287,18 @@ impl<'a> BinaryReader<'a> {
             offset,
             memory,
         })
+    }
+
+    fn read_ordering(&mut self) -> Result<Ordering> {
+        let byte = self.read_u8()?;
+        match byte {
+            0 => Ok(Ordering::SeqCst),
+            1 => Ok(Ordering::RelAcq),
+            x => Err(BinaryReaderError::new(
+                &format!("invalid atomic consistency ordering {}", x),
+                self.original_position() - 1,
+            )),
+        }
     }
 
     fn read_br_table(&mut self) -> Result<BrTable<'a>> {
@@ -1625,6 +1649,10 @@ impl<'a> BinaryReader<'a> {
             0x4c => visitor.visit_i64_atomic_rmw8_cmpxchg_u(self.read_memarg(0)?),
             0x4d => visitor.visit_i64_atomic_rmw16_cmpxchg_u(self.read_memarg(1)?),
             0x4e => visitor.visit_i64_atomic_rmw32_cmpxchg_u(self.read_memarg(2)?),
+
+            // Decode shared-everything-threads proposal.
+            0x4f => visitor.visit_global_atomic_get(self.read_ordering()?, self.read_var_u32()?),
+            0x50 => visitor.visit_global_atomic_set(self.read_ordering()?, self.read_var_u32()?),
 
             _ => bail!(pos, "unknown 0xfe subopcode: 0x{code:x}"),
         })

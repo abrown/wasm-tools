@@ -345,6 +345,14 @@ impl<'a> Encoder<'a> {
                 self.core_func_names.push(name);
                 self.funcs.resource_rep(info.ty.into());
             }
+            CanonicalFuncKind::ThreadSpawn(info) => {
+                self.core_func_names.push(name);
+                self.funcs.thread_spawn(info.ty.into());
+            }
+            CanonicalFuncKind::ThreadHwConcurrency(info) => {
+                self.core_func_names.push(name);
+                self.funcs.thread_hw_concurrency();
+            }
         }
 
         self.flush(Some(self.funcs.id()));
@@ -661,6 +669,7 @@ impl From<core::GlobalType<'_>> for wasm_encoder::GlobalType {
         Self {
             val_type: ty.ty.into(),
             mutable: ty.mutable,
+            shared: ty.shared,
         }
     }
 }

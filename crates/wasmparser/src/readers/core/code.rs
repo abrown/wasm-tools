@@ -42,6 +42,14 @@ impl<'a> FunctionBody<'a> {
         self.reader.allow_memarg64(allow);
     }
 
+    /// Whether or not to allow shared types in the function body.
+    ///
+    /// This is intended to be `true` when support for the
+    /// shared-everything-threads WebAssembly proposal is also enabled.
+    pub fn allow_extended_shared(&mut self, allow: bool) {
+        self.reader.allow_extended_shared(allow);
+    }
+
     /// Gets a binary reader for this function body.
     pub fn get_binary_reader(&self) -> BinaryReader<'a> {
         self.reader.clone()

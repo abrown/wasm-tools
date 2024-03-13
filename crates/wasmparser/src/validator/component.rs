@@ -10,7 +10,6 @@ use super::{
         ModuleType, RecordType, Remapping, ResourceId, TypeAlloc, TypeList, VariantCase,
     },
 };
-use crate::validator::names::{ComponentName, ComponentNameKind, KebabStr, KebabString};
 use crate::{
     limits::*,
     types::{
@@ -20,8 +19,12 @@ use crate::{
     },
     BinaryReaderError, CanonicalOption, ComponentExportName, ComponentExternalKind,
     ComponentOuterAliasKind, ComponentTypeRef, CompositeType, ExternalKind, FuncType, GlobalType,
-    InstantiationArgKind, MemoryType, RecGroup, Result, SubType, TableType, TypeBounds, ValType,
-    WasmFeatures,
+    InstantiationArgKind, MemoryType, RecGroup, RefType, Result, SubType, TableType, TypeBounds,
+    ValType, WasmFeatures,
+};
+use crate::{
+    validator::names::{ComponentName, ComponentNameKind, KebabStr, KebabString},
+    PrimitiveValType,
 };
 use indexmap::{map::Entry, IndexMap, IndexSet};
 use std::collections::{HashMap, HashSet};
@@ -1098,6 +1101,72 @@ impl ComponentState {
             return Ok(id);
         }
         bail!(offset, "type index {} is not a resource type", idx)
+    }
+
+    pub fn thread_spawn(
+        &mut self,
+        func_ty_index: u32,
+        types: &mut TypeAlloc,
+        offset: usize,
+    ) -> Result<()> {
+        // TODO: should we record what types can be spawned?
+        // TODO: should we record that this component uses threads?
+
+        // Validate the type accepted by `thread.spawn`. TODO: it is kind of
+        // weird that we're trying to define $ft here in component types--does
+        // this make sense?
+        let ty = self.function_type_at(func_ty_index, types, offset)?;
+        match *ty.params {
+            [(_, ComponentValType::Primitive(PrimitiveValType::U32))] => {}
+            _ => bail!(
+                offset,
+                "spawn function must take a single `u32` argument (currently)"
+            ),
+        }
+        if !ty.results.is_empty() {
+            bail!(offset, "spawn function must not return any values");
+        }
+
+        // TODO: at this stage it seems impossible to generate the appropriate
+        // core type that fully describes the start function. E.g., we want to
+        // say, "create a core function that takes a `(ref null $ft)`" where $ft
+        // is [i32] -> []. But, here at the component level, we don't have any
+        // place to generate $ft into. `self.add_core_type()` operates on
+        // multiple components (?). So for now we just degrade the type to a
+        // `(ref null func)`.
+        let start_func_ty = RefType::FUNCREF;
+
+        // Insert the core function.
+        let core_ty = SubType {
+            is_final: false,
+            supertype_idx: None,
+            composite_type: CompositeType::Func(FuncType::new(
+                [ValType::Ref(start_func_ty), ValType::I32],
+                [ValType::I32],
+            )),
+        };
+        let (_is_new, group_id) =
+            types.intern_canonical_rec_group(RecGroup::implicit(offset, core_ty));
+        let id = types[group_id].start;
+        self.core_funcs.push(id);
+
+        Ok(())
+    }
+
+    pub fn thread_hw_concurrency(&mut self, types: &mut TypeAlloc, offset: usize) -> Result<()> {
+        // TODO: should we record that this component uses threads?
+
+        let core_ty = SubType {
+            is_final: false,
+            supertype_idx: None,
+            composite_type: CompositeType::Func(FuncType::new([], [ValType::I32])),
+        };
+        let (_is_new, group_id) =
+            types.intern_canonical_rec_group(RecGroup::implicit(offset, core_ty));
+        let id = types[group_id].start;
+        self.core_funcs.push(id);
+
+        Ok(())
     }
 
     pub fn add_component(&mut self, component: ComponentType, types: &mut TypeAlloc) -> Result<()> {

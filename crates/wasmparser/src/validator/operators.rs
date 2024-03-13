@@ -3970,6 +3970,24 @@ where
         self.pop_operand(Some(ValType::Ref(RefType::I31REF)))?;
         self.push_operand(ValType::I32)
     }
+    fn visit_global_atomic_get(
+        &mut self,
+        _ordering: crate::Ordering,
+        global_index: u32,
+    ) -> Self::Output {
+        // No validation of `ordering` is needed because `global.atomic.get` can
+        // be used on shared and unshared globals.
+        self.visit_global_get(global_index)
+    }
+    fn visit_global_atomic_set(
+        &mut self,
+        _ordering: crate::Ordering,
+        global_index: u32,
+    ) -> Self::Output {
+        // No validation of `ordering` is needed because `global.atomic.set` can
+        // be used on shared and unshared globals.
+        self.visit_global_set(global_index)
+    }
 }
 
 #[derive(Clone, Debug)]

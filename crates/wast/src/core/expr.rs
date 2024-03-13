@@ -800,6 +800,10 @@ instructions! {
         I64AtomicRmw16CmpxchgU(MemArg<2>) : [0xfe, 0x4d] : "i64.atomic.rmw16.cmpxchg_u",
         I64AtomicRmw32CmpxchgU(MemArg<4>) : [0xfe, 0x4e] : "i64.atomic.rmw32.cmpxchg_u",
 
+        // proposal: shared-everything-threads
+        GlobalAtomicGet(OrderedAccess<'a>) : [0xfe, 0x4f] : "global.atomic.get",
+        GlobalAtomicSet(OrderedAccess<'a>) : [0xfe, 0x50] : "global.atomic.set",
+
         // proposal: simd
         //
         // https://webassembly.github.io/simd/core/binary/instructions.html
@@ -1727,6 +1731,46 @@ impl<'a> Parse<'a> for BrOnCastFail<'a> {
             from_type: parser.parse()?,
             to_type: parser.parse()?,
         })
+    }
+}
+
+/// The memory ordering for atomic instructions.
+#[derive(Debug)]
+pub enum Ordering {
+    /// TODO
+    SeqCst,
+    /// TODO
+    AcqRel,
+}
+
+impl<'a> Parse<'a> for Ordering {
+    fn parse(parser: Parser<'a>) -> Result<Self> {
+        if parser.peek::<kw::seq_cst>()? {
+            parser.parse::<kw::seq_cst>()?;
+            Ok(Ordering::SeqCst)
+        } else if parser.peek::<kw::rel_acq>()? {
+            parser.parse::<kw::rel_acq>()?;
+            Ok(Ordering::AcqRel)
+        } else {
+            Err(parser.error("expected a memory ordering: `seq_cst` or `rel_acq`"))
+        }
+    }
+}
+
+/// Extra data associated with the `global.atomic.*` instructions.
+#[derive(Debug)]
+pub struct OrderedAccess<'a> {
+    /// The memory ordering for this atomic instruction.
+    pub ordering: Ordering,
+    /// The index of the global to access.
+    pub index: Index<'a>,
+}
+
+impl<'a> Parse<'a> for OrderedAccess<'a> {
+    fn parse(parser: Parser<'a>) -> Result<Self> {
+        let ordering = parser.parse()?;
+        let index = parser.parse()?;
+        Ok(OrderedAccess { ordering, index })
     }
 }
 
