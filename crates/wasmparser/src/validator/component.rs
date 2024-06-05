@@ -1029,7 +1029,7 @@ impl ComponentState {
         let core_ty = SubType {
             is_final: true,
             supertype_idx: None,
-            composite_type: CompositeType::Func(FuncType::new([rep], [ValType::I32])),
+            composite_type: CompositeType::Func(FuncType::new([rep], [ValType::I32], todo!())),
         };
         let (_is_new, group_id) =
             types.intern_canonical_rec_group(RecGroup::implicit(offset, core_ty));
@@ -1048,7 +1048,7 @@ impl ComponentState {
         let core_ty = SubType {
             is_final: true,
             supertype_idx: None,
-            composite_type: CompositeType::Func(FuncType::new([ValType::I32], [])),
+            composite_type: CompositeType::Func(FuncType::new([ValType::I32], [], todo!())),
         };
         let (_is_new, group_id) =
             types.intern_canonical_rec_group(RecGroup::implicit(offset, core_ty));
@@ -1067,7 +1067,7 @@ impl ComponentState {
         let core_ty = SubType {
             is_final: true,
             supertype_idx: None,
-            composite_type: CompositeType::Func(FuncType::new([ValType::I32], [rep])),
+            composite_type: CompositeType::Func(FuncType::new([ValType::I32], [rep], todo!())),
         };
         let (_is_new, group_id) =
             types.intern_canonical_rec_group(RecGroup::implicit(offset, core_ty));

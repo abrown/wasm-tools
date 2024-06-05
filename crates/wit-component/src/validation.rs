@@ -32,6 +32,7 @@ fn wasm_sig_to_func_type(signature: WasmSignature) -> FuncType {
     FuncType::new(
         signature.params.iter().map(from_wasm_type),
         signature.results.iter().map(from_wasm_type),
+        todo!()
     )
 }
 
@@ -660,7 +661,7 @@ fn valid_imported_resource_func<'a>(
     if let Some(resource_name) = func_name.strip_prefix(RESOURCE_DROP) {
         if is_resource(resource_name) {
             let ty = types[types.core_type_at(ty).unwrap_sub()].unwrap_func();
-            let expected = FuncType::new([ValType::I32], []);
+            let expected = FuncType::new([ValType::I32], [], todo!());
             validate_func_sig(func_name, &expected, ty)?;
             return Ok(Some(resource_name));
         }
@@ -683,7 +684,7 @@ fn valid_exported_resource_func<'a>(
     {
         if is_resource(resource_name) {
             let ty = types[types.core_type_at(ty).unwrap_sub()].unwrap_func();
-            let expected = FuncType::new([ValType::I32], [ValType::I32]);
+            let expected = FuncType::new([ValType::I32], [ValType::I32], todo!());
             validate_func_sig(func_name, &expected, ty)?;
             return Ok(Some(resource_name));
         }
@@ -832,7 +833,7 @@ fn validate_exported_item<'a>(
                 if let Some((_, name, func_idx)) = exports.get_full(dtor.as_str()) {
                     let id = types.core_function_at(*func_idx);
                     let ty = types[id].unwrap_func();
-                    let expected = FuncType::new([ValType::I32], []);
+                    let expected = FuncType::new([ValType::I32], [], todo!());
                     validate_func_sig(name, &expected, ty)?;
                     info.dtor_export = Some(name.to_string());
                 }

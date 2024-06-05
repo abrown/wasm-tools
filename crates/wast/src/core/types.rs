@@ -167,6 +167,7 @@ impl<'a> Peek for HeapType<'a> {
 #[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub struct RefType<'a> {
     pub nullable: bool,
+    pub shared: bool,
     pub heap: HeapType<'a>,
 }
 
@@ -175,6 +176,7 @@ impl<'a> RefType<'a> {
     pub fn func() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::Func,
         }
     }
@@ -183,6 +185,7 @@ impl<'a> RefType<'a> {
     pub fn r#extern() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::Extern,
         }
     }
@@ -191,6 +194,7 @@ impl<'a> RefType<'a> {
     pub fn exn() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::Exn,
         }
     }
@@ -199,6 +203,7 @@ impl<'a> RefType<'a> {
     pub fn any() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::Any,
         }
     }
@@ -207,6 +212,7 @@ impl<'a> RefType<'a> {
     pub fn eq() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::Eq,
         }
     }
@@ -215,6 +221,7 @@ impl<'a> RefType<'a> {
     pub fn r#struct() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::Struct,
         }
     }
@@ -223,6 +230,7 @@ impl<'a> RefType<'a> {
     pub fn array() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::Array,
         }
     }
@@ -231,6 +239,7 @@ impl<'a> RefType<'a> {
     pub fn i31() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::I31,
         }
     }
@@ -239,6 +248,7 @@ impl<'a> RefType<'a> {
     pub fn nullfuncref() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::NoFunc,
         }
     }
@@ -247,6 +257,7 @@ impl<'a> RefType<'a> {
     pub fn nullexternref() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::NoExtern,
         }
     }
@@ -255,6 +266,7 @@ impl<'a> RefType<'a> {
     pub fn nullref() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::None,
         }
     }
@@ -263,6 +275,7 @@ impl<'a> RefType<'a> {
     pub fn nullexnref() -> Self {
         RefType {
             nullable: true,
+            shared: false,
             heap: HeapType::NoExn,
         }
     }
@@ -319,10 +332,65 @@ impl<'a> Parse<'a> for RefType<'a> {
                         nullable = true;
                     }
 
-                    Ok(RefType {
-                        nullable,
-                        heap: parser.parse()?,
-                    })
+                    if parser.peek::<LParen>()? {
+                        // Long form; i.e., `(ref ... (shared *))`
+                        p.parens(|p| {
+                            p.parse::<kw::shared>()?;
+                            Ok(RefType {
+                                nullable,
+                                shared: true,
+                                heap: parser.parse()?,
+                            })
+                        })
+                    } else {
+                        Ok(RefType {
+                            nullable,
+                            shared: false,
+                            heap: parser.parse()?,
+                        })
+                    }
+                } else if l.peek::<kw::shared>()? {
+                    // Short form; i.e., `(shared *ref)`.
+                    p.parse::<kw::shared>()?;
+                    if l.peek::<kw::funcref>()? {
+                        parser.parse::<kw::funcref>()?;
+                        Ok(RefType::func())
+                    } else if l.peek::<kw::externref>()? {
+                        parser.parse::<kw::externref>()?;
+                        Ok(RefType::r#extern())
+                    } else if l.peek::<kw::exnref>()? {
+                        parser.parse::<kw::exnref>()?;
+                        Ok(RefType::exn())
+                    } else if l.peek::<kw::anyref>()? {
+                        parser.parse::<kw::anyref>()?;
+                        Ok(RefType::any())
+                    } else if l.peek::<kw::eqref>()? {
+                        parser.parse::<kw::eqref>()?;
+                        Ok(RefType::eq())
+                    } else if l.peek::<kw::structref>()? {
+                        parser.parse::<kw::structref>()?;
+                        Ok(RefType::r#struct())
+                    } else if l.peek::<kw::arrayref>()? {
+                        parser.parse::<kw::arrayref>()?;
+                        Ok(RefType::array())
+                    } else if l.peek::<kw::i31ref>()? {
+                        parser.parse::<kw::i31ref>()?;
+                        Ok(RefType::i31())
+                    } else if l.peek::<kw::nullfuncref>()? {
+                        parser.parse::<kw::nullfuncref>()?;
+                        Ok(RefType::nullfuncref())
+                    } else if l.peek::<kw::nullexternref>()? {
+                        parser.parse::<kw::nullexternref>()?;
+                        Ok(RefType::nullexternref())
+                    } else if l.peek::<kw::nullexnref>()? {
+                        parser.parse::<kw::nullexnref>()?;
+                        Ok(RefType::nullexnref())
+                    } else if l.peek::<kw::nullref>()? {
+                        parser.parse::<kw::nullref>()?;
+                        Ok(RefType::nullref())
+                    } else {
+                        Err(l.error())
+                    }
                 } else {
                     Err(l.error())
                 }
@@ -347,7 +415,8 @@ impl<'a> Peek for RefType<'a> {
             || kw::nullexternref::peek(cursor)?
             || kw::nullexnref::peek(cursor)?
             || kw::nullref::peek(cursor)?
-            || (LParen::peek(cursor)? && kw::r#ref::peek2(cursor)?))
+            || (LParen::peek(cursor)? && kw::r#ref::peek2(cursor)?)
+            || (LParen::peek(cursor)? && kw::shared::peek2(cursor)?)) // TODO: check past shared?
     }
     fn display() -> &'static str {
         "reftype"

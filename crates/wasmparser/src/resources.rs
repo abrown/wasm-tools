@@ -67,6 +67,9 @@ pub trait WasmModuleResources {
     /// Is `a` a subtype of `b`?
     fn is_subtype(&self, a: ValType, b: ValType) -> bool;
 
+    /// Is `a` shared?
+    fn is_shared(&self, a: ValType) -> bool;
+
     /// Check and canonicalize a value type.
     ///
     /// This will validate that `t` is valid under the `features` provided and
@@ -94,9 +97,10 @@ pub trait WasmModuleResources {
         offset: usize,
     ) -> Result<(), BinaryReaderError> {
         let is_nullable = ref_type.is_nullable();
+        let is_shared = todo!();
         let mut heap_ty = ref_type.heap_type();
         self.check_heap_type(&mut heap_ty, offset)?;
-        *ref_type = RefType::new(is_nullable, heap_ty).unwrap();
+        *ref_type = RefType::new(is_nullable, is_shared, heap_ty).unwrap();
         Ok(())
     }
 
@@ -161,6 +165,9 @@ where
     fn is_subtype(&self, a: ValType, b: ValType) -> bool {
         T::is_subtype(self, a, b)
     }
+    fn is_shared(&self, a: ValType) -> bool {
+        T::is_shared(self, a)
+    }
 
     fn element_count(&self) -> u32 {
         T::element_count(self)
@@ -219,6 +226,10 @@ where
 
     fn is_subtype(&self, a: ValType, b: ValType) -> bool {
         T::is_subtype(self, a, b)
+    }
+
+    fn is_shared(&self, a: ValType) -> bool {
+        T::is_shared(self, a)
     }
 
     fn element_count(&self) -> u32 {

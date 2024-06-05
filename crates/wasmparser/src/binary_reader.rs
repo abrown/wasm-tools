@@ -1154,14 +1154,15 @@ impl<'a> BinaryReader<'a> {
                     0b11 => (true, true),
                     _ => bail!(pos, "invalid cast flags: {cast_flags:08b}"),
                 };
+                let is_shared = todo!();
                 let from_heap_type = self.read()?;
-                let from_ref_type =
-                    RefType::new(from_type_nullable, from_heap_type).ok_or_else(|| {
+                let from_ref_type = RefType::new(from_type_nullable, is_shared, from_heap_type)
+                    .ok_or_else(|| {
                         format_err!(pos, "implementation error: type index too large")
                     })?;
                 let to_heap_type = self.read()?;
-                let to_ref_type =
-                    RefType::new(to_type_nullable, to_heap_type).ok_or_else(|| {
+                let to_ref_type = RefType::new(to_type_nullable, is_shared, to_heap_type)
+                    .ok_or_else(|| {
                         format_err!(pos, "implementation error: type index too large")
                     })?;
                 visitor.visit_br_on_cast(relative_depth, from_ref_type, to_ref_type)
@@ -1177,14 +1178,15 @@ impl<'a> BinaryReader<'a> {
                     3 => (true, true),
                     _ => bail!(pos, "invalid cast flags: {cast_flags:08b}"),
                 };
+                let is_shared = todo!();
                 let from_heap_type = self.read()?;
-                let from_ref_type =
-                    RefType::new(from_type_nullable, from_heap_type).ok_or_else(|| {
+                let from_ref_type = RefType::new(from_type_nullable, is_shared, from_heap_type)
+                    .ok_or_else(|| {
                         format_err!(pos, "implementation error: type index too large")
                     })?;
                 let to_heap_type = self.read()?;
-                let to_ref_type =
-                    RefType::new(to_type_nullable, to_heap_type).ok_or_else(|| {
+                let to_ref_type = RefType::new(to_type_nullable, is_shared, to_heap_type)
+                    .ok_or_else(|| {
                         format_err!(pos, "implementation error: type index too large")
                     })?;
                 visitor.visit_br_on_cast_fail(relative_depth, from_ref_type, to_ref_type)

@@ -1007,12 +1007,14 @@ impl Module {
         features: &WasmFeatures,
         offset: usize,
     ) -> Result<()> {
+        // TODO: check that we can't have a shared type if the
+        // shared-everything-threads proposal is not enabled.
         features
             .check_ref_type(*ty)
             .map_err(|e| BinaryReaderError::new(e, offset))?;
         let mut hty = ty.heap_type();
         self.check_heap_type(&mut hty, offset)?;
-        *ty = RefType::new(ty.is_nullable(), hty).unwrap();
+        *ty = RefType::new(ty.is_nullable(), todo!(), hty).unwrap();
         Ok(())
     }
 
@@ -1036,6 +1038,8 @@ impl Module {
         match type_index {
             UnpackedIndex::Module(idx) => {
                 let id = self.type_id_at(*idx, offset)?;
+                // TODO: check that we can't have a shared type at `id` if the
+                // shared-everything-threads proposal is not enabled.
                 *type_index = UnpackedIndex::Id(id);
                 Ok(())
             }
@@ -1083,7 +1087,10 @@ impl Module {
                     offset,
                 ));
             }
-            if !ty.content_type.is_shared() {
+
+            // TODO: this is incorrect, we need some way to look at a TypeList
+            // to inspect the type that concrete heap types point to.
+            if !ty.content_type.is_shared().unwrap_or(false) {
                 return Err(BinaryReaderError::new(
                     "shared globals must have a shared value type",
                     offset,
@@ -1287,6 +1294,10 @@ impl WasmModuleResources for OperatorValidatorResources<'_> {
         self.types.valtype_is_subtype(a, b)
     }
 
+    fn is_shared(&self, a: ValType) -> bool {
+        self.types.valtype_is_shared(a)
+    }
+
     fn element_count(&self) -> u32 {
         self.module.element_types.len() as u32
     }
@@ -1357,6 +1368,10 @@ impl WasmModuleResources for ValidatorResources {
 
     fn is_subtype(&self, a: ValType, b: ValType) -> bool {
         self.0.snapshot.as_ref().unwrap().valtype_is_subtype(a, b)
+    }
+
+    fn is_shared(&self, a: ValType) -> bool {
+        self.0.snapshot.as_ref().unwrap().valtype_is_shared(a)
     }
 
     fn element_count(&self) -> u32 {

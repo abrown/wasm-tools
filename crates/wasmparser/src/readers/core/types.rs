@@ -579,6 +579,8 @@ pub struct FuncType {
     params_results: Box<[ValType]>,
     /// The number of parameter types.
     len_params: usize,
+    /// Whether the function type is shared.
+    shared: bool,
 }
 
 impl fmt::Debug for FuncType {
@@ -592,7 +594,7 @@ impl fmt::Debug for FuncType {
 
 impl FuncType {
     /// Creates a new [`FuncType`] from the given `params` and `results`.
-    pub fn new<P, R>(params: P, results: R) -> Self
+    pub fn new<P, R>(params: P, results: R, shared: bool) -> Self
     where
         P: IntoIterator<Item = ValType>,
         R: IntoIterator<Item = ValType>,
@@ -603,6 +605,7 @@ impl FuncType {
         Self {
             params_results: buffer.into(),
             len_params,
+            shared,
         }
     }
 
@@ -611,11 +614,16 @@ impl FuncType {
     /// # Panics
     ///
     /// If `len_params` is greater than the length of `params_results` combined.
-    pub(crate) fn from_raw_parts(params_results: Box<[ValType]>, len_params: usize) -> Self {
+    pub(crate) fn from_raw_parts(
+        params_results: Box<[ValType]>,
+        len_params: usize,
+        shared: bool,
+    ) -> Self {
         assert!(len_params <= params_results.len());
         Self {
             params_results,
             len_params,
+            shared,
         }
     }
 
@@ -819,11 +827,13 @@ impl ValType {
     }
 
     /// Whether the type is `shared`.
-    pub fn is_shared(&self) -> bool {
+    ///
+    /// Note that in the case of `(ref $ty_index)`, we cannot determine if the
+    /// indexed type is shared without inspecting it and thus return `None`.
+    pub fn is_shared(&self) -> Option<bool> {
         match *self {
-            Self::I32 | Self::I64 | Self::F32 | Self::F64 | Self::V128 => true,
-            // TODO: parsing of `shared` refs is not yet implemented.
-            Self::Ref(_) => false,
+            Self::I32 | Self::I64 | Self::F32 | Self::F64 | Self::V128 => Some(true),
+            Self::Ref(ty) => ty.is_shared(),
         }
     }
 
@@ -857,26 +867,28 @@ impl ValType {
 /// The GC proposal introduces heap types: any, eq, i31, struct, array,
 /// nofunc, noextern, none.
 //
-// RefType is a bit-packed enum that fits in a `u24` aka `[u8; 3]`.
-// Note that its content is opaque (and subject to change), but its API
-// is stable.
+// RefType is a bit-packed enum that fits in a `u24` aka `[u8; 3]`. Note that
+// its content is opaque (and subject to change), but its API is stable.
 //
 // It has the following internal structure:
 //
 // ```
-// [nullable:u1 concrete==1:u1 index:u22]
-// [nullable:u1 concrete==0:u1 abstype:u4 (unused):u18]
+// [nullable:u1 concrete==1:u1 index:u21]
+// [nullable:u1 concrete==0:u1 shared:u1 abstype:u4 (unused):u18]
 // ```
 //
 // Where
 //
 // - `nullable` determines nullability of the ref,
 //
-// - `concrete` determines if the ref is of a dynamically defined type
-//   with an index (encoded in a following bit-packing section) or of a
-//   known fixed type,
+// - `concrete` determines if the ref is of a dynamically defined type with an
+//   index (encoded in a following bit-packing section) or of a known fixed
+//   type,
 //
 // - `index` is the type index,
+//
+// - `shared` determines if the ref is shared, but only if it is not concrete in
+//   which case we would need to examine the type at the concrete index,
 //
 // - `abstype` is an enumeration of abstract types:
 //
@@ -903,33 +915,30 @@ pub struct RefType([u8; 3]);
 
 impl fmt::Debug for RefType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match (self.is_nullable(), self.heap_type()) {
-            (true, HeapType::Any) => write!(f, "anyref"),
-            (false, HeapType::Any) => write!(f, "(ref any)"),
-            (true, HeapType::None) => write!(f, "nullref"),
-            (false, HeapType::None) => write!(f, "(ref none)"),
-            (true, HeapType::NoExtern) => write!(f, "nullexternref"),
-            (false, HeapType::NoExtern) => write!(f, "(ref noextern)"),
-            (true, HeapType::NoFunc) => write!(f, "nullfuncref"),
-            (false, HeapType::NoFunc) => write!(f, "(ref nofunc)"),
-            (true, HeapType::Eq) => write!(f, "eqref"),
-            (false, HeapType::Eq) => write!(f, "(ref eq)"),
-            (true, HeapType::Struct) => write!(f, "structref"),
-            (false, HeapType::Struct) => write!(f, "(ref struct)"),
-            (true, HeapType::Array) => write!(f, "arrayref"),
-            (false, HeapType::Array) => write!(f, "(ref array)"),
-            (true, HeapType::I31) => write!(f, "i31ref"),
-            (false, HeapType::I31) => write!(f, "(ref i31)"),
-            (true, HeapType::Extern) => write!(f, "externref"),
-            (false, HeapType::Extern) => write!(f, "(ref extern)"),
-            (true, HeapType::Func) => write!(f, "funcref"),
-            (false, HeapType::Func) => write!(f, "(ref func)"),
-            (true, HeapType::Exn) => write!(f, "exnref"),
-            (false, HeapType::Exn) => write!(f, "(ref exn)"),
-            (true, HeapType::NoExn) => write!(f, "nullexnref"),
-            (false, HeapType::NoExn) => write!(f, "(ref noexn)"),
-            (true, HeapType::Concrete(idx)) => write!(f, "(ref null {idx})"),
-            (false, HeapType::Concrete(idx)) => write!(f, "(ref {idx})"),
+        let heap_type = self.heap_type();
+        if let HeapType::Concrete(index) = heap_type {
+            // Handle concrete types separately; they always use the long form
+            // and don't show `shared`-ness.
+            if self.is_nullable() {
+                write!(f, "(ref null {})", index)
+            } else {
+                write!(f, "(ref {})", index)
+            }
+        } else {
+            // All non-concrete types follow the same general pattern.
+            let is_nullable = self.is_nullable();
+            let is_shared = self.is_shared().expect("already handled concrete types");
+            let name = heap_type
+                .as_str(is_nullable)
+                .expect("already handled concrete types");
+            match (is_nullable, is_shared) {
+                // Print the shortened form; i.e., `*ref`.
+                (true, true) => write!(f, "(shared {}ref)", name),
+                (true, false) => write!(f, "{}ref", name),
+                // Print the long form; i.e., `(ref *)`.
+                (false, true) => write!(f, "(ref (shared {}))", name),
+                (false, false) => write!(f, "(ref {})", name),
+            }
         }
     }
 }
@@ -965,21 +974,22 @@ impl RefType {
     // These bits are valid for all `RefType`s.
     const NULLABLE_BIT: u32 = 1 << 23;
     const CONCRETE_BIT: u32 = 1 << 22;
+    const SHARED_BIT: u32 = 1 << 21;
 
     // The `abstype` field is valid only when `concrete == 0`.
-    const ABSTYPE_MASK: u32 = 0b1111 << 18;
-    const ANY_ABSTYPE: u32 = 0b1111 << 18;
-    const EQ_ABSTYPE: u32 = 0b1101 << 18;
-    const I31_ABSTYPE: u32 = 0b1000 << 18;
-    const STRUCT_ABSTYPE: u32 = 0b1001 << 18;
-    const ARRAY_ABSTYPE: u32 = 0b1100 << 18;
-    const FUNC_ABSTYPE: u32 = 0b0101 << 18;
-    const NOFUNC_ABSTYPE: u32 = 0b0100 << 18;
-    const EXTERN_ABSTYPE: u32 = 0b0011 << 18;
-    const NOEXTERN_ABSTYPE: u32 = 0b0010 << 18;
-    const EXN_ABSTYPE: u32 = 0b0001 << 18;
-    const NOEXN_ABSTYPE: u32 = 0b1110 << 18;
-    const NONE_ABSTYPE: u32 = 0b0000 << 18;
+    const ABSTYPE_MASK: u32 = 0b1111 << 17;
+    const ANY_ABSTYPE: u32 = 0b1111 << 17;
+    const EQ_ABSTYPE: u32 = 0b1101 << 17;
+    const I31_ABSTYPE: u32 = 0b1000 << 17;
+    const STRUCT_ABSTYPE: u32 = 0b1001 << 17;
+    const ARRAY_ABSTYPE: u32 = 0b1100 << 17;
+    const FUNC_ABSTYPE: u32 = 0b0101 << 17;
+    const NOFUNC_ABSTYPE: u32 = 0b0100 << 17;
+    const EXTERN_ABSTYPE: u32 = 0b0011 << 17;
+    const NOEXTERN_ABSTYPE: u32 = 0b0010 << 17;
+    const EXN_ABSTYPE: u32 = 0b0001 << 17;
+    const NOEXN_ABSTYPE: u32 = 0b1110 << 17;
+    const NONE_ABSTYPE: u32 = 0b0000 << 17;
 
     // The `index` is valid only when `concrete == 1`.
     const INDEX_MASK: u32 = (1 << 22) - 1;
@@ -1126,22 +1136,22 @@ impl RefType {
     ///
     /// Returns `None` when the heap type's type index (if any) is beyond this
     /// crate's implementation limits and therefore is not representable.
-    pub fn new(nullable: bool, heap_type: HeapType) -> Option<Self> {
-        let nullable32 = Self::NULLABLE_BIT * (nullable as u32);
+    pub fn new(nullable: bool, shared: bool, heap_type: HeapType) -> Option<Self> {
+        let base32 = Self::NULLABLE_BIT * (nullable as u32) | Self::SHARED_BIT * (shared as u32);
         match heap_type {
             HeapType::Concrete(index) => Some(RefType::concrete(nullable, index.pack()?)),
-            HeapType::Func => Some(Self::from_u32(nullable32 | Self::FUNC_ABSTYPE)),
-            HeapType::Extern => Some(Self::from_u32(nullable32 | Self::EXTERN_ABSTYPE)),
-            HeapType::Any => Some(Self::from_u32(nullable32 | Self::ANY_ABSTYPE)),
-            HeapType::None => Some(Self::from_u32(nullable32 | Self::NONE_ABSTYPE)),
-            HeapType::NoExtern => Some(Self::from_u32(nullable32 | Self::NOEXTERN_ABSTYPE)),
-            HeapType::NoFunc => Some(Self::from_u32(nullable32 | Self::NOFUNC_ABSTYPE)),
-            HeapType::Eq => Some(Self::from_u32(nullable32 | Self::EQ_ABSTYPE)),
-            HeapType::Struct => Some(Self::from_u32(nullable32 | Self::STRUCT_ABSTYPE)),
-            HeapType::Array => Some(Self::from_u32(nullable32 | Self::ARRAY_ABSTYPE)),
-            HeapType::I31 => Some(Self::from_u32(nullable32 | Self::I31_ABSTYPE)),
-            HeapType::Exn => Some(Self::from_u32(nullable32 | Self::EXN_ABSTYPE)),
-            HeapType::NoExn => Some(Self::from_u32(nullable32 | Self::NOEXN_ABSTYPE)),
+            HeapType::Func => Some(Self::from_u32(base32 | Self::FUNC_ABSTYPE)),
+            HeapType::Extern => Some(Self::from_u32(base32 | Self::EXTERN_ABSTYPE)),
+            HeapType::Any => Some(Self::from_u32(base32 | Self::ANY_ABSTYPE)),
+            HeapType::None => Some(Self::from_u32(base32 | Self::NONE_ABSTYPE)),
+            HeapType::NoExtern => Some(Self::from_u32(base32 | Self::NOEXTERN_ABSTYPE)),
+            HeapType::NoFunc => Some(Self::from_u32(base32 | Self::NOFUNC_ABSTYPE)),
+            HeapType::Eq => Some(Self::from_u32(base32 | Self::EQ_ABSTYPE)),
+            HeapType::Struct => Some(Self::from_u32(base32 | Self::STRUCT_ABSTYPE)),
+            HeapType::Array => Some(Self::from_u32(base32 | Self::ARRAY_ABSTYPE)),
+            HeapType::I31 => Some(Self::from_u32(base32 | Self::I31_ABSTYPE)),
+            HeapType::Exn => Some(Self::from_u32(base32 | Self::EXN_ABSTYPE)),
+            HeapType::NoExn => Some(Self::from_u32(base32 | Self::NOEXN_ABSTYPE)),
         }
     }
 
@@ -1155,6 +1165,12 @@ impl RefType {
             } else {
                 a.is_nullable()
             },
+            // TODO: how to handle the concrete-invisible-sharedness case?
+            if b.is_shared().unwrap_or(false) {
+                false
+            } else {
+                a.is_shared().unwrap_or(false)
+            },
             a.heap_type(),
         )
         .unwrap()
@@ -1163,6 +1179,18 @@ impl RefType {
     /// Is this a reference to an concrete type?
     pub const fn is_concrete_type_ref(&self) -> bool {
         self.as_u32() & Self::CONCRETE_BIT != 0
+    }
+
+    /// Is this a reference to a shared type?
+    ///
+    /// Note that we cannot know if a concrete type is shared unless we read the
+    /// type at the index, which is not possible here (i.e., `None`).
+    pub const fn is_shared(&self) -> Option<bool> {
+        if self.is_concrete_type_ref() {
+            None
+        } else {
+            Some(self.as_u32() & Self::SHARED_BIT != 0)
+        }
     }
 
     /// If this is a reference to a concrete Wasm-defined type, get its
@@ -1193,7 +1221,7 @@ impl RefType {
         !self.is_concrete_type_ref() && self.abstype() == Self::EXTERN_ABSTYPE
     }
 
-    /// Is this the abstract untyped array refrence type aka `(ref null
+    /// Is this the abstract untyped array reference type aka `(ref null
     /// array)` aka `arrayref`?
     pub const fn is_array_ref(&self) -> bool {
         !self.is_concrete_type_ref() && self.abstype() == Self::ARRAY_ABSTYPE
@@ -1277,6 +1305,19 @@ impl RefType {
             (false, HeapType::NoExn) => "(ref noexn)",
         }
     }
+}
+
+/// A shared heap type.
+pub enum SharedHeapType {
+    /// TODO
+    Abstract {
+        /// Whether the type is shared.
+        shared: bool,
+        /// The heap type.
+        ty: HeapType
+    },
+    /// TODO
+    Concrete(UnpackedIndex)
 }
 
 /// A heap type.
@@ -1369,6 +1410,30 @@ pub enum HeapType {
     NoExn,
 }
 
+impl HeapType {
+    fn as_str(&self, nullable: bool) -> Option<&str> {
+        match (nullable, self) {
+            (_, HeapType::Any) => Some("any"),
+            (true, HeapType::None) => Some("null"),
+            (false, HeapType::None) => Some("none"),
+            (true, HeapType::NoExtern) => Some("nullextern"),
+            (false, HeapType::NoExtern) => Some("noextern"),
+            (true, HeapType::NoFunc) => Some("nullfunc"),
+            (false, HeapType::NoFunc) => Some("nofunc"),
+            (_, HeapType::Eq) => Some("eqf"),
+            (_, HeapType::Struct) => Some("struct"),
+            (_, HeapType::Array) => Some("array"),
+            (_, HeapType::I31) => Some("i31"),
+            (_, HeapType::Extern) => Some("extern"),
+            (_, HeapType::Func) => Some("func"),
+            (_, HeapType::Exn) => Some("exn"),
+            (true, HeapType::NoExn) => Some("nullexn"),
+            (false, HeapType::NoExn) => Some("noexn"),
+            (_, HeapType::Concrete(_)) => None,
+        }
+    }
+}
+
 impl ValType {
     pub(crate) fn is_valtype_byte(byte: u8) -> bool {
         match byte {
@@ -1440,10 +1505,11 @@ impl<'a> FromReader<'a> for RefType {
             0x6C => Ok(RefType::I31.nullable()),
             0x69 => Ok(RefType::EXN.nullable()),
             0x74 => Ok(RefType::NOEXN.nullable()),
-            byte @ (0x63 | 0x64) => {
-                let nullable = byte == 0x63;
+            byte @ (0x63 | 0x64 | 0x65 | 0x66) => {
+                let nullable = byte == 0x63 || byte == 0x65;
+                let shared = byte == 0x64 || byte == 0x66;
                 let pos = reader.original_position();
-                RefType::new(nullable, reader.read()?)
+                RefType::new(nullable, shared, reader.read()?)
                     .ok_or_else(|| crate::BinaryReaderError::new("type index too large", pos))
             }
             _ => bail!(reader.original_position(), "malformed reference type"),
@@ -1750,7 +1816,11 @@ impl<'a> FromReader<'a> for FuncType {
         for result in results {
             params_results.push(result?);
         }
-        Ok(FuncType::from_raw_parts(params_results.into(), len_params))
+        Ok(FuncType::from_raw_parts(
+            params_results.into(),
+            len_params,
+            todo!(),
+        ))
     }
 }
 

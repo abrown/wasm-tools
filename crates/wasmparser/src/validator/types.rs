@@ -95,6 +95,7 @@ impl LoweredTypes {
 pub(crate) struct LoweringInfo {
     pub(crate) params: LoweredTypes,
     pub(crate) results: LoweredTypes,
+    pub(crate) shared: bool,
     pub(crate) requires_memory: bool,
     pub(crate) requires_realloc: bool,
 }
@@ -104,6 +105,7 @@ impl LoweringInfo {
         FuncType::new(
             self.params.as_slice().iter().copied(),
             self.results.as_slice().iter().copied(),
+            self.shared,
         )
     }
 }
@@ -113,6 +115,7 @@ impl Default for LoweringInfo {
         Self {
             params: LoweredTypes::new(MAX_FLAT_FUNC_PARAMS),
             results: LoweredTypes::new(MAX_FLAT_FUNC_RESULTS),
+            shared: false,
             requires_memory: false,
             requires_realloc: false,
         }
@@ -2816,6 +2819,19 @@ impl TypeList {
             | (ValType::F32, _)
             | (ValType::F64, _)
             | (ValType::V128, _) => false,
+        }
+    }
+
+    /// Like `id_is_subtype` but for `RefType`s.
+    ///
+    /// Both `a` and `b` must be canonicalized already.
+    pub fn valtype_is_shared(&self, a: ValType) -> bool {
+        match a {
+            ValType::I32 | ValType::I64 | ValType::F32 | ValType::F64 | ValType::V128 => true,
+            ValType::Ref(r) => match r.heap_type() {
+                HeapType::Concrete(i) => todo!(),
+                _ => r.is_shared().unwrap(),
+            },
         }
     }
 

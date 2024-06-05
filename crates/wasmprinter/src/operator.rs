@@ -533,25 +533,25 @@ macro_rules! define_visit {
     );
     (payload $self:ident RefTestNonNull $hty:ident) => (
         $self.push_str(" ");
-        let rty = RefType::new(false, $hty)
+        let rty = RefType::new(false, todo!(), $hty)
             .ok_or_else(|| anyhow!("implementation limit: type index too large"))?;
         $self.printer.print_reftype($self.state, rty)?;
     );
     (payload $self:ident RefTestNullable $hty:ident) => (
         $self.push_str(" ");
-        let rty = RefType::new(true, $hty)
+        let rty = RefType::new(true, todo!(), $hty)
             .ok_or_else(|| anyhow!("implementation limit: type index too large"))?;
         $self.printer.print_reftype($self.state, rty)?;
     );
     (payload $self:ident RefCastNonNull $hty:ident) => (
         $self.push_str(" ");
-        let rty = RefType::new(false, $hty)
+        let rty = RefType::new(false, todo!(), $hty)
             .ok_or_else(|| anyhow!("implementation limit: type index too large"))?;
         $self.printer.print_reftype($self.state, rty)?;
     );
     (payload $self:ident RefCastNullable $hty:ident) => (
         $self.push_str(" ");
-        let rty = RefType::new(true, $hty)
+        let rty = RefType::new(true, todo!(), $hty)
             .ok_or_else(|| anyhow!("implementation limit: type index too large"))?;
         $self.printer.print_reftype($self.state, rty)?;
     );

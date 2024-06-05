@@ -313,57 +313,68 @@ impl<'a> Encode for RefType<'a> {
             // The 'funcref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::Func,
             } => e.push(0x70),
             // The 'externref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::Extern,
             } => e.push(0x6f),
             // The 'exnref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::Exn,
             } => e.push(0x69),
             // The 'eqref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::Eq,
             } => e.push(0x6d),
             // The 'structref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::Struct,
             } => e.push(0x6b),
             // The 'i31ref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::I31,
             } => e.push(0x6c),
             // The 'nullfuncref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::NoFunc,
             } => e.push(0x73),
             // The 'nullexternref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::NoExtern,
             } => e.push(0x72),
             // The 'nullexnref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::NoExn,
             } => e.push(0x74),
             // The 'nullref' binary abbreviation
             RefType {
                 nullable: true,
+                shared: false,
                 heap: HeapType::None,
             } => e.push(0x71),
 
             // Generic 'ref null <heaptype>' encoding
             RefType {
                 nullable: true,
+                shared: false,
                 heap,
             } => {
                 e.push(0x63);
@@ -372,9 +383,28 @@ impl<'a> Encode for RefType<'a> {
             // Generic 'ref <heaptype>' encoding
             RefType {
                 nullable: false,
+                shared: false,
                 heap,
             } => {
                 e.push(0x64);
+                heap.encode(e);
+            }
+            // Generic 'ref null (shared <heaptype>)' encoding
+            RefType {
+                nullable: true,
+                shared: true,
+                heap,
+            } => {
+                e.push(0x65);
+                heap.encode(e);
+            }
+            // Generic 'ref (shared <heaptype>)' encoding
+            RefType {
+                nullable: false,
+                shared: true,
+                heap,
+            } => {
+                e.push(0x66);
                 heap.encode(e);
             }
         }
@@ -606,6 +636,7 @@ impl Encode for Elem<'_> {
                     ty:
                         RefType {
                             nullable: true,
+                            shared: false,
                             heap: HeapType::Func,
                         },
                     ..

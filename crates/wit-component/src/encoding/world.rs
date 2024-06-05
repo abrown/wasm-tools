@@ -202,6 +202,7 @@ impl<'a> ComponentWorld<'a> {
                     wasmparser::FuncType::new(
                         ty.params.iter().map(to_valty),
                         ty.results.iter().map(to_valty),
+                        todo!()
                     ),
                     Some(func),
                 ),

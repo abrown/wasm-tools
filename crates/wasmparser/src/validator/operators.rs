@@ -445,7 +445,7 @@ where
         self.resources.check_heap_type(&mut heap_ty, self.offset)?;
         debug_assert!(matches!(heap_ty, HeapType::Concrete(UnpackedIndex::Id(_))));
 
-        let ref_ty = RefType::new(nullable, heap_ty).ok_or_else(|| {
+        let ref_ty = RefType::new(nullable, false, heap_ty).ok_or_else(|| {
             format_err!(self.offset, "implementation limit: type index too large")
         })?;
 
@@ -459,7 +459,8 @@ where
         self.resources.check_heap_type(&mut heap_ty, self.offset)?;
         debug_assert!(matches!(heap_ty, HeapType::Concrete(UnpackedIndex::Id(_))));
 
-        let ref_ty = RefType::new(nullable, heap_ty).ok_or_else(|| {
+        let shared = todo!();
+        let ref_ty = RefType::new(nullable, shared, heap_ty).ok_or_else(|| {
             format_err!(self.offset, "implementation limit: type index too large")
         })?;
 
@@ -842,13 +843,15 @@ where
     /// for this call (to be used with `check_call_ty` or
     /// `check_return_call_ty`).
     fn check_call_ref_ty(&mut self, type_index: u32) -> Result<&'resources FuncType> {
+        let is_shared = todo!();
         let unpacked_index = UnpackedIndex::Module(type_index);
         let mut hty = HeapType::Concrete(unpacked_index);
         self.resources.check_heap_type(&mut hty, self.offset)?;
         // If `None` is popped then that means a "bottom" type was popped which
         // is always considered equivalent to the `hty` tag.
         if let Some(rt) = self.pop_ref()? {
-            let expected = RefType::new(true, hty).expect("hty should be previously validated");
+            let expected =
+                RefType::new(true, is_shared, hty).expect("hty should be previously validated");
             let expected = ValType::Ref(expected);
             if !self.resources.is_subtype(ValType::Ref(rt), expected) {
                 bail!(
@@ -1097,10 +1100,11 @@ where
         mut heap_type: HeapType,
         inst_name: &str,
     ) -> Result<ValType> {
+        let is_shared = todo!();
         self.resources
             .check_heap_type(&mut heap_type, self.offset)?;
 
-        let sub_ty = RefType::new(nullable, heap_type)
+        let sub_ty = RefType::new(nullable, is_shared, heap_type)
             .map(ValType::from)
             .ok_or_else(|| {
                 BinaryReaderError::new("implementation limit: type index too large", self.offset)
@@ -1111,7 +1115,7 @@ where
                 .as_reference_type()
                 .expect("we created this as a reference just above")
         });
-        let sup_ty = RefType::new(true, self.resources.top_type(&sup_ty.heap_type()))
+        let sup_ty = RefType::new(true, todo!(), self.resources.top_type(&sup_ty.heap_type()))
             .expect("can't panic with non-concrete heap types");
 
         if !self.resources.is_subtype(sub_ty, sup_ty.into()) {
@@ -2575,7 +2579,8 @@ where
         Ok(())
     }
     fn visit_ref_null(&mut self, mut heap_type: HeapType) -> Self::Output {
-        if let Some(ty) = RefType::new(true, heap_type) {
+        let is_shared = todo!();
+        if let Some(ty) = RefType::new(true, is_shared, heap_type) {
             self.features
                 .check_ref_type(ty)
                 .map_err(|e| BinaryReaderError::new(e, self.offset))?;
@@ -2583,7 +2588,8 @@ where
         self.resources
             .check_heap_type(&mut heap_type, self.offset)?;
         let ty = ValType::Ref(
-            RefType::new(true, heap_type).expect("existing heap types should be within our limits"),
+            RefType::new(true, is_shared, heap_type)
+                .expect("existing heap types should be within our limits"),
         );
         self.push_operand(ty)?;
         Ok(())
@@ -2661,8 +2667,9 @@ where
         }
 
         let index = UnpackedIndex::Id(type_id);
+        let is_shared = todo!();
         let ty = ValType::Ref(
-            RefType::new(false, HeapType::Concrete(index)).ok_or_else(|| {
+            RefType::new(false, is_shared, HeapType::Concrete(index)).ok_or_else(|| {
                 BinaryReaderError::new("implementation limit: type index too large", self.offset)
             })?,
         );
@@ -3991,7 +3998,8 @@ where
         let is_nullable = extern_ref
             .as_type()
             .map_or(false, |ty| ty.as_reference_type().unwrap().is_nullable());
-        let any_ref = RefType::new(is_nullable, HeapType::Any).unwrap();
+        let is_shared = extern_ref.as_type().map_or(false, |ty| todo!());
+        let any_ref = RefType::new(is_nullable, is_shared, HeapType::Any).unwrap();
         self.push_operand(any_ref)
     }
     fn visit_extern_convert_any(&mut self) -> Self::Output {
@@ -3999,7 +4007,8 @@ where
         let is_nullable = any_ref
             .as_type()
             .map_or(false, |ty| ty.as_reference_type().unwrap().is_nullable());
-        let extern_ref = RefType::new(is_nullable, HeapType::Extern).unwrap();
+        let is_shared = any_ref.as_type().map_or(false, |ty| todo!());
+        let extern_ref = RefType::new(is_nullable, is_shared, HeapType::Extern).unwrap();
         self.push_operand(extern_ref)
     }
     fn visit_ref_test_non_null(&mut self, heap_type: HeapType) -> Self::Output {
