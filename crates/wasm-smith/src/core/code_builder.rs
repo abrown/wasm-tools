@@ -6019,7 +6019,7 @@ fn array_new_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
         && module
             .array_types
             .iter()
-            .any(|i| builder.field_type_on_stack_at(module, 1, module.ty(*i).unwrap_array().0))
+            .any(|i| builder.field_type_on_stack_at(module, 1, module.ty(*i).unwrap_array().field))
 }
 
 fn array_new(
@@ -6031,7 +6031,7 @@ fn array_new(
     let n = module
         .array_types
         .iter()
-        .filter(|i| builder.field_type_on_stack_at(module, 1, module.ty(**i).unwrap_array().0))
+        .filter(|i| builder.field_type_on_stack_at(module, 1, module.ty(**i).unwrap_array().field))
         .count();
     debug_assert!(n > 0);
     let i = u.int_in_range(0..=n - 1)?;
@@ -6039,7 +6039,7 @@ fn array_new(
         .array_types
         .iter()
         .copied()
-        .filter(|i| builder.field_type_on_stack_at(module, 1, module.ty(*i).unwrap_array().0))
+        .filter(|i| builder.field_type_on_stack_at(module, 1, module.ty(*i).unwrap_array().field))
         .nth(i)
         .unwrap();
 
@@ -6060,7 +6060,7 @@ fn array_new_fixed_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
         && module
             .array_types
             .iter()
-            .any(|i| builder.field_type_on_stack(module, module.ty(*i).unwrap_array().0))
+            .any(|i| builder.field_type_on_stack(module, module.ty(*i).unwrap_array().field))
 }
 
 fn array_new_fixed(
@@ -6072,7 +6072,7 @@ fn array_new_fixed(
     let n = module
         .array_types
         .iter()
-        .filter(|i| builder.field_type_on_stack(module, module.ty(**i).unwrap_array().0))
+        .filter(|i| builder.field_type_on_stack(module, module.ty(**i).unwrap_array().field))
         .count();
     debug_assert!(n > 0);
     let i = u.int_in_range(0..=n - 1)?;
@@ -6080,13 +6080,13 @@ fn array_new_fixed(
         .array_types
         .iter()
         .copied()
-        .filter(|i| builder.field_type_on_stack(module, module.ty(*i).unwrap_array().0))
+        .filter(|i| builder.field_type_on_stack(module, module.ty(*i).unwrap_array().field))
         .nth(i)
         .unwrap();
     let elem_ty = module
         .ty(array_type_index)
         .unwrap_array()
-        .0
+        .field
         .element_type
         .unpack();
 
@@ -6119,7 +6119,7 @@ fn array_new_default_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
         && module
             .array_types
             .iter()
-            .any(|i| module.ty(*i).unwrap_array().0.element_type.is_defaultable())
+            .any(|i| module.ty(*i).unwrap_array().field.element_type.is_defaultable())
 }
 
 fn array_new_default(
@@ -6135,7 +6135,7 @@ fn array_new_default(
             module
                 .ty(**i)
                 .unwrap_array()
-                .0
+                .field
                 .element_type
                 .is_defaultable()
         })
@@ -6146,7 +6146,7 @@ fn array_new_default(
         .array_types
         .iter()
         .copied()
-        .filter(|i| module.ty(*i).unwrap_array().0.element_type.is_defaultable())
+        .filter(|i| module.ty(*i).unwrap_array().field.element_type.is_defaultable())
         .nth(i)
         .unwrap();
 
@@ -6167,7 +6167,7 @@ fn array_new_data_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
         && !module.data.is_empty()
         && builder.types_on_stack(module, &[ValType::I32, ValType::I32])
         && module.array_types.iter().any(|i| {
-            let ty = module.ty(*i).unwrap_array().0.element_type.unpack();
+            let ty = module.ty(*i).unwrap_array().field.element_type.unpack();
             ty.is_numeric() | ty.is_vector()
         })
 }
@@ -6182,7 +6182,7 @@ fn array_new_data(
         .array_types
         .iter()
         .filter(|i| {
-            let ty = module.ty(**i).unwrap_array().0.element_type.unpack();
+            let ty = module.ty(**i).unwrap_array().field.element_type.unpack();
             ty.is_numeric() | ty.is_vector()
         })
         .count();
@@ -6193,7 +6193,7 @@ fn array_new_data(
         .iter()
         .copied()
         .filter(|i| {
-            let ty = module.ty(*i).unwrap_array().0.element_type.unpack();
+            let ty = module.ty(*i).unwrap_array().field.element_type.unpack();
             ty.is_numeric() | ty.is_vector()
         })
         .nth(i)
@@ -6221,7 +6221,7 @@ fn module_has_elem_segment_of_array_type(module: &Module, ty: &ArrayType) -> boo
     module
         .elems
         .iter()
-        .any(|elem| module.val_type_is_sub_type(ValType::Ref(elem.ty), ty.0.element_type.unpack()))
+        .any(|elem| module.val_type_is_sub_type(ValType::Ref(elem.ty), ty.field.element_type.unpack()))
 }
 
 #[inline]
@@ -6258,7 +6258,7 @@ fn array_new_elem(
     let elem_ty = module
         .ty(array_type_index)
         .unwrap_array()
-        .0
+        .field
         .element_type
         .unpack();
 
@@ -6308,7 +6308,7 @@ fn array_get(
 ) -> Result<()> {
     builder.pop_operand();
     let (_, array_type_index) = builder.pop_concrete_ref_type();
-    let elem_ty = module.ty(array_type_index).unwrap_array().0.element_type;
+    let elem_ty = module.ty(array_type_index).unwrap_array().field.element_type;
     builder.push_operand(Some(elem_ty.unpack()));
     instructions.push(match elem_ty {
         StorageType::I8 | StorageType::I16 => {
@@ -6335,7 +6335,7 @@ fn array_set_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
     match builder.concrete_array_ref_type_on_stack_at(module, 2) {
         None => false,
         Some((_nullable, _idx, array_ty)) => {
-            array_ty.0.mutable && builder.field_type_on_stack(module, array_ty.0)
+            array_ty.field.mutable && builder.field_type_on_stack(module, array_ty.field)
         }
     }
 }
@@ -6383,7 +6383,7 @@ fn array_fill_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
     match builder.concrete_array_ref_type_on_stack_at(module, 3) {
         None => return false,
         Some((_, _, array_ty)) => {
-            array_ty.0.mutable && builder.field_type_on_stack_at(module, 1, array_ty.0)
+            array_ty.field.mutable && builder.field_type_on_stack_at(module, 1, array_ty.field)
         }
     }
 }
@@ -6417,14 +6417,14 @@ fn array_copy_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
         None => return false,
         Some((_, _, x)) => x,
     };
-    if !x.0.mutable {
+    if !x.field.mutable {
         return false;
     }
     let y = match builder.concrete_array_ref_type_on_stack_at(module, 2) {
         None => return false,
         Some((_, _, y)) => y,
     };
-    match (x.0.element_type, y.0.element_type) {
+    match (x.field.element_type, y.field.element_type) {
         (StorageType::I8, StorageType::I8) => true,
         (StorageType::I8, _) => false,
         (StorageType::I16, StorageType::I16) => true,
@@ -6465,8 +6465,8 @@ fn array_init_data_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
     match builder.concrete_array_ref_type_on_stack_at(module, 3) {
         None => return false,
         Some((_, _, ty)) => {
-            let elem_ty = ty.0.element_type.unpack();
-            ty.0.mutable && (elem_ty.is_numeric() || elem_ty.is_vector())
+            let elem_ty = ty.field.element_type.unpack();
+            ty.field.mutable && (elem_ty.is_numeric() || elem_ty.is_vector())
         }
     }
 }
@@ -6505,7 +6505,7 @@ fn array_init_elem_valid(module: &Module, builder: &mut CodeBuilder) -> bool {
     match builder.concrete_array_ref_type_on_stack_at(module, 3) {
         None => return false,
         Some((_, _, array_ty)) => {
-            array_ty.0.mutable && module_has_elem_segment_of_array_type(module, &array_ty)
+            array_ty.field.mutable && module_has_elem_segment_of_array_type(module, &array_ty)
         }
     }
 }
@@ -6524,7 +6524,7 @@ fn array_init_elem(
     let elem_ty = module
         .ty(array_type_index)
         .unwrap_array()
-        .0
+        .field
         .element_type
         .unpack();
 

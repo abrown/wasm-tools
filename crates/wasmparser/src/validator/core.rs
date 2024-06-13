@@ -667,7 +667,7 @@ impl Module {
                         offset,
                     ));
                 }
-                match &t.0.element_type {
+                match &t.field.element_type {
                     StorageType::I8 | StorageType::I16 => {}
                     StorageType::Val(value_type) => check(value_type)?,
                 };

@@ -200,8 +200,8 @@ impl Matches for WithRecGroup<ArrayType> {
     fn matches(types: &TypeList, a: Self, b: Self) -> bool {
         Matches::matches(
             types,
-            WithRecGroup::map(a, |a| a.0),
-            WithRecGroup::map(b, |b| b.0),
+            WithRecGroup::map(a, |a| a.field),
+            WithRecGroup::map(b, |b| b.field),
         )
     }
 }

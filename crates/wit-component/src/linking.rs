@@ -292,6 +292,7 @@ fn make_env_module<'a>(
                             types.function(
                                 ty.parameters.iter().copied().map(ValType::from),
                                 ty.results.iter().copied().map(ValType::from),
+                                false, // TODO: handle shared
                             );
                             EntityType::Function(index)
                         }
@@ -314,7 +315,7 @@ fn make_env_module<'a>(
             }
             let index = get_and_increment(&mut function_count);
 
-            types.function(vec![], vec![]);
+            types.function(vec![], vec![], false);
             imports.import(metadata.name, "_start", EntityType::Function(index));
 
             wasi_start = Some(index);
@@ -332,7 +333,7 @@ fn make_env_module<'a>(
 
     if let Some(exporter) = cabi_realloc_exporter {
         let index = get_and_increment(&mut function_count);
-        types.function([ValType::I32; 4], [ValType::I32]);
+        types.function([ValType::I32; 4], [ValType::I32], false);
         imports.import(exporter, "cabi_realloc", EntityType::Function(index));
         exports.export("cabi_realloc", ExportKind::Func, index);
     }
@@ -426,6 +427,7 @@ fn make_env_module<'a>(
         types.function(
             ty.parameters.iter().copied().map(ValType::from),
             ty.results.iter().copied().map(ValType::from),
+            false, // TODO: handle shared
         );
         functions.function(u32::try_from(index).unwrap());
         let mut function = Function::new([]);
@@ -514,9 +516,9 @@ fn make_init_module(
 
     // TODO: deduplicate types
     let mut types = TypeSection::new();
-    types.function([], []);
+    types.function([], [], false);
     let thunk_ty = 0;
-    types.function([ValType::I32], []);
+    types.function([ValType::I32], [], false);
     let one_i32_param_ty = 1;
     let mut type_offset = 2;
 
@@ -527,6 +529,7 @@ fn make_init_module(
                     types.function(
                         ty.parameters.iter().copied().map(ValType::from),
                         ty.results.iter().copied().map(ValType::from),
+                        false, // TODO: handle shared
                     );
                 }
             }
@@ -536,6 +539,7 @@ fn make_init_module(
         types.function(
             ty.parameters.iter().copied().map(ValType::from),
             ty.results.iter().copied().map(ValType::from),
+            false, // TODO: handle shared
         );
     }
     module.section(&types);
@@ -1130,6 +1134,7 @@ fn make_stubs_module(missing: &[(&str, Export)]) -> Vec<u8> {
         types.function(
             ty.parameters.iter().copied().map(ValType::from),
             ty.results.iter().copied().map(ValType::from),
+            false,
         );
         functions.function(offset);
         let mut function = Function::new([]);

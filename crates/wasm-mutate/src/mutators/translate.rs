@@ -143,6 +143,7 @@ pub fn func_type(
             .iter()
             .map(|ty| t.translate_ty(ty))
             .collect::<Result<Vec<_>>>()?,
+        ty.shared,
     );
     Ok(())
 }

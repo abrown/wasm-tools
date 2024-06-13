@@ -513,7 +513,7 @@ impl SubType {
                 }
             }
             CompositeType::Array(ty) => {
-                ty.0.remap_indices(f)?;
+                ty.field.remap_indices(f)?;
             }
             CompositeType::Struct(ty) => {
                 for field in ty.fields.iter_mut() {
@@ -584,6 +584,8 @@ pub struct FuncType {
     params_results: Box<[ValType]>,
     /// The number of parameter types.
     len_params: usize,
+    /// Whether the function is shared.
+    pub shared: bool,
 }
 
 impl fmt::Debug for FuncType {
@@ -608,6 +610,7 @@ impl FuncType {
         Self {
             params_results: buffer.into(),
             len_params,
+            shared: false,
         }
     }
 
@@ -621,6 +624,7 @@ impl FuncType {
         Self {
             params_results,
             len_params,
+            shared: false,
         }
     }
 
@@ -678,7 +682,12 @@ impl FuncType {
 
 /// Represents a type of an array in a WebAssembly module.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ArrayType(pub FieldType);
+pub struct ArrayType {
+    /// The element type of the array.
+    pub field: FieldType,
+    /// Whether the array is shared.
+    pub shared: bool,
+}
 
 /// Represents a field type of an array or a struct.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -749,6 +758,8 @@ impl StorageType {
 pub struct StructType {
     /// Struct fields.
     pub fields: Box<[FieldType]>,
+    /// Whether the struct is shared.
+    pub shared: bool,
 }
 
 /// Represents the types of values in a WebAssembly module.
@@ -1927,15 +1938,31 @@ impl<'a> FromReader<'a> for FieldType {
 
 impl<'a> FromReader<'a> for ArrayType {
     fn from_reader(reader: &mut BinaryReader<'a>) -> Result<Self> {
-        Ok(ArrayType(FieldType::from_reader(reader)?))
+        let shared = if reader.peek()? == 0x65 {
+            reader.read_u8()?;
+            true
+        } else {
+            false
+        };
+        Ok(ArrayType {
+            field: FieldType::from_reader(reader)?,
+            shared,
+        })
     }
 }
 
 impl<'a> FromReader<'a> for StructType {
     fn from_reader(reader: &mut BinaryReader<'a>) -> Result<Self> {
+        let shared = if reader.peek()? == 0x65 {
+            reader.read_u8()?;
+            true
+        } else {
+            false
+        };
         let fields = reader.read_iter(MAX_WASM_STRUCT_FIELDS, "struct fields")?;
         Ok(StructType {
             fields: fields.collect::<Result<_>>()?,
+            shared,
         })
     }
 }

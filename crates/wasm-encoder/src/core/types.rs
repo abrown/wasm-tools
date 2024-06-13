@@ -57,12 +57,13 @@ impl Encode for CompositeType {
                 sink,
                 ty.params().iter().copied(),
                 ty.results().iter().copied(),
+                ty.shared,
             ),
-            CompositeType::Array(ArrayType(ty)) => {
-                TypeSection::encode_array(sink, &ty.element_type, ty.mutable)
+            CompositeType::Array(ty) => {
+                TypeSection::encode_array(sink, &ty.field.element_type, ty.field.mutable, ty.shared)
             }
             CompositeType::Struct(ty) => {
-                TypeSection::encode_struct(sink, ty.fields.iter().cloned())
+                TypeSection::encode_struct(sink, ty.fields.iter().cloned(), ty.shared)
             }
         }
     }
@@ -87,6 +88,8 @@ pub struct FuncType {
     params_results: Box<[ValType]>,
     /// The number of parameter types.
     len_params: usize,
+    /// Is the function shared?
+    shared: bool,
 }
 
 #[cfg(feature = "wasmparser")]
@@ -97,19 +100,31 @@ impl TryFrom<wasmparser::FuncType> for FuncType {
         for ty in func_ty.params().iter().chain(func_ty.results()).copied() {
             buf.push(ty.try_into()?);
         }
-        Ok(FuncType::from_parts(buf.into(), func_ty.params().len()))
+        Ok(FuncType::from_parts(
+            buf.into(),
+            func_ty.params().len(),
+            func_ty.shared,
+        ))
     }
 }
 
 /// Represents a type of an array in a WebAssembly module.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
-pub struct ArrayType(pub FieldType);
+pub struct ArrayType {
+    /// The field type of the array.
+    pub field: FieldType,
+    /// Is the array shared?
+    pub shared: bool,
+}
 
 #[cfg(feature = "wasmparser")]
 impl TryFrom<wasmparser::ArrayType> for ArrayType {
     type Error = ();
     fn try_from(array_ty: wasmparser::ArrayType) -> Result<Self, Self::Error> {
-        Ok(ArrayType(array_ty.0.try_into()?))
+        Ok(ArrayType {
+            field: array_ty.field.try_into()?,
+            shared: array_ty.shared,
+        })
     }
 }
 
@@ -118,6 +133,8 @@ impl TryFrom<wasmparser::ArrayType> for ArrayType {
 pub struct StructType {
     /// Struct fields.
     pub fields: Box<[FieldType]>,
+    /// Is the struct shared?
+    pub shared: bool,
 }
 
 #[cfg(feature = "wasmparser")]
@@ -131,6 +148,7 @@ impl TryFrom<wasmparser::StructType> for StructType {
                 .cloned()
                 .map(TryInto::try_into)
                 .collect::<Result<_, _>>()?,
+            shared: struct_ty.shared,
         })
     }
 }
@@ -259,7 +277,7 @@ impl ValType {
 
 impl FuncType {
     /// Creates a new [`FuncType`] from the given `params` and `results`.
-    pub fn new<P, R>(params: P, results: R) -> Self
+    pub fn new<P, R>(params: P, results: R, shared: bool) -> Self
     where
         P: IntoIterator<Item = ValType>,
         R: IntoIterator<Item = ValType>,
@@ -267,14 +285,19 @@ impl FuncType {
         let mut buffer = params.into_iter().collect::<Vec<_>>();
         let len_params = buffer.len();
         buffer.extend(results);
-        Self::from_parts(buffer.into(), len_params)
+        Self::from_parts(buffer.into(), len_params, shared)
     }
 
     #[inline]
-    pub(crate) fn from_parts(params_results: Box<[ValType]>, len_params: usize) -> Self {
+    pub(crate) fn from_parts(
+        params_results: Box<[ValType]>,
+        len_params: usize,
+        shared: bool,
+    ) -> Self {
         Self {
             params_results,
             len_params,
+            shared,
         }
     }
 
@@ -637,7 +660,7 @@ impl From<wasmparser::AbstractHeapType> for AbstractHeapType {
 ///
 /// let mut types = TypeSection::new();
 ///
-/// types.function([ValType::I32, ValType::I32], [ValType::I64]);
+/// types.function([ValType::I32, ValType::I32], [ValType::I64], false);
 ///
 /// let mut module = Module::new();
 /// module.section(&types);
@@ -667,19 +690,19 @@ impl TypeSection {
     }
 
     /// Define a function type in this type section.
-    pub fn function<P, R>(&mut self, params: P, results: R) -> &mut Self
+    pub fn function<P, R>(&mut self, params: P, results: R, shared: bool) -> &mut Self
     where
         P: IntoIterator<Item = ValType>,
         P::IntoIter: ExactSizeIterator,
         R: IntoIterator<Item = ValType>,
         R::IntoIter: ExactSizeIterator,
     {
-        Self::encode_function(&mut self.bytes, params, results);
+        Self::encode_function(&mut self.bytes, params, results, shared);
         self.num_added += 1;
         self
     }
 
-    fn encode_function<P, R>(sink: &mut Vec<u8>, params: P, results: R)
+    fn encode_function<P, R>(sink: &mut Vec<u8>, params: P, results: R, shared: bool)
     where
         P: IntoIterator<Item = ValType>,
         P::IntoIter: ExactSizeIterator,
@@ -689,6 +712,9 @@ impl TypeSection {
         let params = params.into_iter();
         let results = results.into_iter();
 
+        if shared {
+            sink.push(0x65);
+        }
         sink.push(0x60);
         params.len().encode(sink);
         params.for_each(|p| p.encode(sink));
@@ -697,13 +723,16 @@ impl TypeSection {
     }
 
     /// Define an array type in this type section.
-    pub fn array(&mut self, ty: &StorageType, mutable: bool) -> &mut Self {
-        Self::encode_array(&mut self.bytes, ty, mutable);
+    pub fn array(&mut self, ty: &StorageType, mutable: bool, shared: bool) -> &mut Self {
+        Self::encode_array(&mut self.bytes, ty, mutable, shared);
         self.num_added += 1;
         self
     }
 
-    fn encode_array(sink: &mut Vec<u8>, ty: &StorageType, mutable: bool) {
+    fn encode_array(sink: &mut Vec<u8>, ty: &StorageType, mutable: bool, shared: bool) {
+        if shared {
+            sink.push(0x65);
+        }
         sink.push(0x5e);
         Self::encode_field(sink, ty, mutable);
     }
@@ -714,22 +743,26 @@ impl TypeSection {
     }
 
     /// Define a struct type in this type section.
-    pub fn struct_<F>(&mut self, fields: F) -> &mut Self
+    pub fn struct_<F>(&mut self, fields: F, shared: bool) -> &mut Self
     where
         F: IntoIterator<Item = FieldType>,
         F::IntoIter: ExactSizeIterator,
     {
-        Self::encode_struct(&mut self.bytes, fields);
+        Self::encode_struct(&mut self.bytes, fields, shared);
         self.num_added += 1;
         self
     }
 
-    fn encode_struct<F>(sink: &mut Vec<u8>, fields: F)
+    fn encode_struct<F>(sink: &mut Vec<u8>, fields: F, shared: bool)
     where
         F: IntoIterator<Item = FieldType>,
         F::IntoIter: ExactSizeIterator,
     {
         let fields = fields.into_iter();
+
+        if shared {
+            sink.push(0x65);
+        }
         sink.push(0x5f);
         fields.len().encode(sink);
         for f in fields {
@@ -784,7 +817,7 @@ mod tests {
         types.subtype(&SubType {
             is_final: true,
             supertype_idx: None,
-            composite_type: CompositeType::Func(FuncType::new([], [])),
+            composite_type: CompositeType::Func(FuncType::new([], [], false)),
         });
 
         let mut module = Module::new();

@@ -555,6 +555,7 @@ impl<'a> Module<'a> {
             types.function(
                 ty.params().iter().map(|t| map.valty(*t)),
                 ty.results().iter().map(|t| map.valty(*t)),
+                false, // TODO: handle shared
             );
 
             // Keep track of the "empty type" to see if we can reuse an
@@ -673,13 +674,14 @@ impl<'a> Module<'a> {
                     wasm_encoder::ValType::I32,
                 ],
                 [wasm_encoder::ValType::I32],
+                false,
             );
             type_index
         };
 
         let add_empty_type = |types: &mut wasm_encoder::TypeSection| {
             let type_index = types.len();
-            types.function([], []);
+            types.function([], [], false);
             type_index
         };
 
@@ -807,7 +809,7 @@ impl<'a> Module<'a> {
                 // Generate a function type for this start function, adding a new
                 // function type to the module if necessary.
                 let empty_type = empty_type.unwrap_or_else(|| {
-                    types.function([], []);
+                    types.function([], [], false);
                     types.len() - 1
                 });
                 funcs.function(empty_type);

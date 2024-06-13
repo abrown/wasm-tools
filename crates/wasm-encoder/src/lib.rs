@@ -36,7 +36,7 @@
 //! let mut types = TypeSection::new();
 //! let params = vec![ValType::I32, ValType::I32];
 //! let results = vec![ValType::I32];
-//! types.function(params, results);
+//! types.function(params, results, false);
 //! module.section(&types);
 //!
 //! // Encode the function section.

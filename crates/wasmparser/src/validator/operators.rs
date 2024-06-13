@@ -3757,12 +3757,12 @@ where
     fn visit_array_new(&mut self, type_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
         self.pop_operand(Some(ValType::I32))?;
-        self.pop_operand(Some(array_ty.0.element_type.unpack()))?;
+        self.pop_operand(Some(array_ty.field.element_type.unpack()))?;
         self.push_concrete_ref(false, type_index)
     }
     fn visit_array_new_default(&mut self, type_index: u32) -> Self::Output {
         let ty = self.array_type_at(type_index)?;
-        let val_ty = ty.0.element_type.unpack();
+        let val_ty = ty.field.element_type.unpack();
         if !val_ty.is_defaultable() {
             bail!(
                 self.offset,
@@ -3774,7 +3774,7 @@ where
     }
     fn visit_array_new_fixed(&mut self, type_index: u32, n: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        let elem_ty = array_ty.0.element_type.unpack();
+        let elem_ty = array_ty.field.element_type.unpack();
         for _ in 0..n {
             self.pop_operand(Some(elem_ty))?;
         }
@@ -3782,7 +3782,7 @@ where
     }
     fn visit_array_new_data(&mut self, type_index: u32, data_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        let elem_ty = array_ty.0.element_type.unpack();
+        let elem_ty = array_ty.field.element_type.unpack();
         match elem_ty {
             ValType::I32 | ValType::I64 | ValType::F32 | ValType::F64 | ValType::V128 => {}
             ValType::Ref(_) => bail!(
@@ -3801,7 +3801,7 @@ where
     }
     fn visit_array_new_elem(&mut self, type_index: u32, elem_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        let array_ref_ty = match array_ty.0.element_type.unpack() {
+        let array_ref_ty = match array_ty.field.element_type.unpack() {
             ValType::Ref(rt) => rt,
             ValType::I32 | ValType::I64 | ValType::F32 | ValType::F64 | ValType::V128 => bail!(
                 self.offset,
@@ -3825,7 +3825,7 @@ where
     }
     fn visit_array_get(&mut self, type_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        let elem_ty = array_ty.0.element_type;
+        let elem_ty = array_ty.field.element_type;
         if elem_ty.is_packed() {
             bail!(
                 self.offset,
@@ -3838,7 +3838,7 @@ where
     }
     fn visit_array_get_s(&mut self, type_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        let elem_ty = array_ty.0.element_type;
+        let elem_ty = array_ty.field.element_type;
         if !elem_ty.is_packed() {
             bail!(
                 self.offset,
@@ -3851,7 +3851,7 @@ where
     }
     fn visit_array_get_u(&mut self, type_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        let elem_ty = array_ty.0.element_type;
+        let elem_ty = array_ty.field.element_type;
         if !elem_ty.is_packed() {
             bail!(
                 self.offset,
@@ -3864,10 +3864,10 @@ where
     }
     fn visit_array_set(&mut self, type_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        if !array_ty.0.mutable {
+        if !array_ty.field.mutable {
             bail!(self.offset, "invalid array.set: array is immutable")
         }
-        self.pop_operand(Some(array_ty.0.element_type.unpack()))?;
+        self.pop_operand(Some(array_ty.field.element_type.unpack()))?;
         self.pop_operand(Some(ValType::I32))?;
         self.pop_concrete_ref(true, type_index)?;
         Ok(())
@@ -3878,25 +3878,28 @@ where
     }
     fn visit_array_fill(&mut self, array_type_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(array_type_index)?;
-        if !array_ty.0.mutable {
+        if !array_ty.field.mutable {
             bail!(self.offset, "invalid array.fill: array is immutable");
         }
         self.pop_operand(Some(ValType::I32))?;
-        self.pop_operand(Some(array_ty.0.element_type.unpack()))?;
+        self.pop_operand(Some(array_ty.field.element_type.unpack()))?;
         self.pop_operand(Some(ValType::I32))?;
         self.pop_concrete_ref(true, array_type_index)?;
         Ok(())
     }
     fn visit_array_copy(&mut self, type_index_dst: u32, type_index_src: u32) -> Self::Output {
         let array_ty_dst = self.array_type_at(type_index_dst)?;
-        if !array_ty_dst.0.mutable {
+        if !array_ty_dst.field.mutable {
             bail!(
                 self.offset,
                 "invalid array.copy: destination array is immutable"
             );
         }
         let array_ty_src = self.array_type_at(type_index_src)?;
-        match (array_ty_dst.0.element_type, array_ty_src.0.element_type) {
+        match (
+            array_ty_dst.field.element_type,
+            array_ty_src.field.element_type,
+        ) {
             (StorageType::I8, StorageType::I8) => {}
             (StorageType::I8, ty) => bail!(
                 self.offset,
@@ -3935,10 +3938,10 @@ where
         array_data_index: u32,
     ) -> Self::Output {
         let array_ty = self.array_type_at(array_type_index)?;
-        if !array_ty.0.mutable {
+        if !array_ty.field.mutable {
             bail!(self.offset, "invalid array.init_data: array is immutable");
         }
-        let val_ty = array_ty.0.element_type.unpack();
+        let val_ty = array_ty.field.element_type.unpack();
         match val_ty {
             ValType::I32 | ValType::I64 | ValType::F32 | ValType::F64 | ValType::V128 => {}
             ValType::Ref(_) => bail!(
@@ -3959,10 +3962,10 @@ where
     }
     fn visit_array_init_elem(&mut self, type_index: u32, elem_index: u32) -> Self::Output {
         let array_ty = self.array_type_at(type_index)?;
-        if !array_ty.0.mutable {
+        if !array_ty.field.mutable {
             bail!(self.offset, "invalid array.init_data: array is immutable");
         }
-        let array_ref_ty = match array_ty.0.element_type.unpack() {
+        let array_ref_ty = match array_ty.field.element_type.unpack() {
             ValType::Ref(rt) => rt,
             ValType::I32 | ValType::I64 | ValType::F32 | ValType::F64 | ValType::V128 => bail!(
                 self.offset,

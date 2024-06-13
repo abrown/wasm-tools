@@ -45,6 +45,7 @@ impl Module {
                             wasm_encoder::CompositeType::Func(wasm_encoder::FuncType::new(
                                 f.params.iter().cloned(),
                                 f.results.iter().cloned(),
+                                false, // TODO: handle shared
                             ))
                         }
                         CompositeType::Struct(s) => wasm_encoder::CompositeType::Struct(s.clone()),
@@ -65,6 +66,7 @@ impl Module {
                                     wasm_encoder::CompositeType::Func(wasm_encoder::FuncType::new(
                                         f.params.iter().cloned(),
                                         f.results.iter().cloned(),
+                                        false, // TODO: handle shared
                                     ))
                                 }
                                 CompositeType::Struct(s) => {

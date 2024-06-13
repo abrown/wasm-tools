@@ -941,7 +941,7 @@ impl Printer<'_, '_> {
     }
 
     fn print_array_type(&mut self, state: &State, ty: &ArrayType) -> Result<u32> {
-        self.print_field_type(state, &ty.0, None)
+        self.print_field_type(state, &ty.field, None)
     }
 
     fn print_struct_type(&mut self, state: &State, ty: &StructType, ty_idx: u32) -> Result<u32> {

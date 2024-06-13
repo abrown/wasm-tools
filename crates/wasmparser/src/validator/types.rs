@@ -2867,13 +2867,17 @@ impl TypeList {
     pub fn top_type(&self, heap_type: &HeapType) -> HeapType {
         use AbstractHeapType::*;
         match *heap_type {
-            HeapType::Concrete(idx) => match self[idx.as_core_type_id().unwrap()].composite_type {
-                CompositeType::Func(_) => HeapType::Abstract {
-                    shared: false, // TODO: handle shared--retrieve from `func` type.
+            HeapType::Concrete(idx) => match &self[idx.as_core_type_id().unwrap()].composite_type {
+                CompositeType::Func(ft) => HeapType::Abstract {
+                    shared: ft.shared,
                     ty: Func,
                 },
-                CompositeType::Array(_) | CompositeType::Struct(_) => HeapType::Abstract {
-                    shared: false, // TODO: handle shared--retrieve from `array` or `struct` type.
+                CompositeType::Array(at) => HeapType::Abstract {
+                    shared: at.shared,
+                    ty: Any,
+                },
+                CompositeType::Struct(st) => HeapType::Abstract {
+                    shared: st.shared,
                     ty: Any,
                 },
             },

@@ -1248,6 +1248,7 @@ impl<'a> EncodingState<'a> {
                 types.function(
                     sig.params.iter().map(to_val_type),
                     sig.results.iter().map(to_val_type),
+                    false, // TODO: handle shared
                 );
                 index
             });

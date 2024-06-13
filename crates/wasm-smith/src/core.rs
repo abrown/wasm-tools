@@ -656,7 +656,7 @@ impl Module {
             .clone();
         match &mut composite_type {
             CompositeType::Array(a) => {
-                a.0 = self.arbitrary_matching_field_type(u, a.0)?;
+                a.field = self.arbitrary_matching_field_type(u, a.field)?;
             }
             CompositeType::Func(f) => {
                 *f = self.arbitrary_matching_func_type(u, f)?;
@@ -687,6 +687,7 @@ impl Module {
         }
         Ok(StructType {
             fields: fields.into_boxed_slice(),
+            shared: false, // TODO: handle shared
         })
     }
 
@@ -952,9 +953,10 @@ impl Module {
         }
 
         match u.int_in_range(0..=2)? {
-            0 => Ok(CompositeType::Array(ArrayType(
-                self.arbitrary_field_type(u)?,
-            ))),
+            0 => Ok(CompositeType::Array(ArrayType {
+                field: self.arbitrary_field_type(u)?,
+                shared: false, // TODO: handle shared
+            })),
             1 => Ok(CompositeType::Func(self.arbitrary_func_type(u)?)),
             2 => Ok(CompositeType::Struct(self.arbitrary_struct_type(u)?)),
             _ => unreachable!(),
@@ -969,6 +971,7 @@ impl Module {
         }
         Ok(StructType {
             fields: fields.into_boxed_slice(),
+            shared: false, // TODO: handle shared
         })
     }
 
