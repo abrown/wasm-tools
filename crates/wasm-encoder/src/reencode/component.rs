@@ -964,6 +964,10 @@ pub mod component_utils {
                 let func_ty = reencoder.type_index(func_ty_index);
                 section.thread_spawn(func_ty);
             }
+            wasmparser::CanonicalFunction::ThreadSpawnIndirect { table_index } => {
+                let table_index = reencoder.table_index(table_index);
+                section.thread_spawn_indirect(table_index);
+            }
             wasmparser::CanonicalFunction::ThreadHwConcurrency => {
                 section.thread_hw_concurrency();
             }

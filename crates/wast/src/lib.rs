@@ -555,6 +555,7 @@ pub mod kw {
     custom_keyword!(import_info = "import-info");
     custom_keyword!(thread);
     custom_keyword!(thread_spawn = "thread.spawn");
+    custom_keyword!(thread_spawn_indirect = "thread.spawn_indirect");
     custom_keyword!(thread_hw_concurrency = "thread.hw_concurrency");
     custom_keyword!(task_backpressure = "task.backpressure");
     custom_keyword!(task_return = "task.return");

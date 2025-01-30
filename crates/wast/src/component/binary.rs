@@ -353,6 +353,10 @@ impl<'a> Encoder<'a> {
                 self.core_func_names.push(name);
                 self.funcs.thread_spawn(info.ty.into());
             }
+            CanonicalFuncKind::ThreadSpawnIndirect(info) => {
+                self.core_func_names.push(name);
+                self.funcs.thread_spawn_indirect(info.table.idx.into());
+            }
             CanonicalFuncKind::ThreadHwConcurrency(_info) => {
                 self.core_func_names.push(name);
                 self.funcs.thread_hw_concurrency();

@@ -386,6 +386,13 @@ impl<'a> Resolver<'a> {
             CanonicalFuncKind::ThreadSpawn(info) => {
                 self.resolve_ns(&mut info.ty, Ns::CoreType)?;
             }
+            CanonicalFuncKind::ThreadSpawnIndirect(info) => {
+                self.core_item_ref(&mut info.table)?;
+                // Eventually this should resolve the specific type associated
+                // with this canonical function, e.g.,
+                // `self.resolve_type_use(&mut info.ty)?;` (TODO: spawn indirect
+                // types).
+            }
             CanonicalFuncKind::ThreadHwConcurrency(_)
             | CanonicalFuncKind::TaskBackpressure
             | CanonicalFuncKind::TaskYield(_)
@@ -964,6 +971,7 @@ impl<'a> ComponentState<'a> {
                 | CanonicalFuncKind::ResourceRep(_)
                 | CanonicalFuncKind::ResourceDrop(_)
                 | CanonicalFuncKind::ThreadSpawn(_)
+                | CanonicalFuncKind::ThreadSpawnIndirect(_)
                 | CanonicalFuncKind::ThreadHwConcurrency(_)
                 | CanonicalFuncKind::TaskBackpressure
                 | CanonicalFuncKind::TaskReturn(_)
@@ -1114,6 +1122,7 @@ component_item!(kw::module, CoreModule);
 
 core_item!(kw::func, CoreFunc);
 core_item!(kw::memory, CoreMemory);
+core_item!(kw::table, CoreTable);
 core_item!(kw::r#type, CoreType);
 core_item!(kw::r#instance, CoreInstance);
 
