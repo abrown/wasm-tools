@@ -1682,7 +1682,7 @@ impl ComponentState {
         bail!(offset, "type index {} is not a resource type", idx)
     }
 
-    pub fn thread_spawn(
+    pub fn thread_spawn_ref(
         &mut self,
         func_ty_index: u32,
         types: &mut TypeAlloc,
@@ -1692,11 +1692,11 @@ impl ComponentState {
         if !features.shared_everything_threads() {
             bail!(
                 offset,
-                "`thread.spawn` requires the shared-everything-threads proposal"
+                "`thread.spawn_ref` requires the shared-everything-threads proposal"
             )
         }
 
-        // Validate the type accepted by `thread.spawn`.
+        // Validate the type accepted by `thread.spawn_ref`.
         let core_type_id = match self.core_type_at(func_ty_index, offset)? {
             ComponentCoreTypeId::Sub(c) => c,
             ComponentCoreTypeId::Module(_) => bail!(offset, "expected a core function type"),

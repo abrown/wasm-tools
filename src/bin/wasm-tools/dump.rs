@@ -418,7 +418,7 @@ impl<'a> Dump<'a> {
                             | CanonicalFunction::ResourceNew { .. }
                             | CanonicalFunction::ResourceDrop { .. }
                             | CanonicalFunction::ResourceRep { .. }
-                            | CanonicalFunction::ThreadSpawn { .. }
+                            | CanonicalFunction::ThreadSpawnRef { .. }
                             | CanonicalFunction::ThreadSpawnIndirect { .. }
                             | CanonicalFunction::ThreadHwConcurrency => {
                                 ("core func", &mut i.core_funcs)

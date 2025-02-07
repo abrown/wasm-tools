@@ -1304,8 +1304,8 @@ impl Validator {
                     crate::CanonicalFunction::ResourceRep { resource } => {
                         current.resource_rep(resource, types, offset)
                     }
-                    crate::CanonicalFunction::ThreadSpawn { func_ty_index } => {
-                        current.thread_spawn(func_ty_index, types, offset, features)
+                    crate::CanonicalFunction::ThreadSpawnRef { func_ty_index } => {
+                        current.thread_spawn_ref(func_ty_index, types, offset, features)
                     }
                     crate::CanonicalFunction::ThreadSpawnIndirect { table_index } => {
                         current.thread_spawn_indirect(table_index, types, offset, features)

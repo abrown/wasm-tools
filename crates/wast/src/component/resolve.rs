@@ -383,7 +383,7 @@ impl<'a> Resolver<'a> {
             CanonicalFuncKind::ResourceDrop(info) => {
                 self.resolve_ns(&mut info.ty, Ns::Type)?;
             }
-            CanonicalFuncKind::ThreadSpawn(info) => {
+            CanonicalFuncKind::ThreadSpawnRef(info) => {
                 self.resolve_ns(&mut info.ty, Ns::CoreType)?;
             }
             CanonicalFuncKind::ThreadSpawnIndirect(info) => {
@@ -970,7 +970,7 @@ impl<'a> ComponentState<'a> {
                 | CanonicalFuncKind::ResourceNew(_)
                 | CanonicalFuncKind::ResourceRep(_)
                 | CanonicalFuncKind::ResourceDrop(_)
-                | CanonicalFuncKind::ThreadSpawn(_)
+                | CanonicalFuncKind::ThreadSpawnRef(_)
                 | CanonicalFuncKind::ThreadSpawnIndirect(_)
                 | CanonicalFuncKind::ThreadHwConcurrency(_)
                 | CanonicalFuncKind::TaskBackpressure
