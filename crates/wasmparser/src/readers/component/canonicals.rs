@@ -285,7 +285,7 @@ impl<'a> FromReader<'a> for CanonicalFunction {
             0x05 => CanonicalFunction::ThreadSpawn {
                 func_ty_index: reader.read()?,
             },
-            0x07 => CanonicalFunction::ThreadSpawnIndirect {
+            0x24 => CanonicalFunction::ThreadSpawnIndirect {
                 table_index: reader.read()?,
             },
             0x06 => CanonicalFunction::ThreadHwConcurrency,
